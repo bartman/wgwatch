@@ -13,6 +13,13 @@ jobs:
       - run: ./dependencies.sh
       - run: make
       - run: make test
+      - run: make deb
+      - run: dpkg -i build/*.deb
+      - run: wgwatch --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wgwatch-deb
+          path: build/*.deb
 
   fedora:
     runs-on: ubuntu-latest
@@ -22,6 +29,13 @@ jobs:
       - run: ./dependencies.sh
       - run: make
       - run: make test
+      - run: make rpm
+      - run: dnf install -y ./build/*.rpm
+      - run: wgwatch --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wgwatch-rpm
+          path: build/*.rpm
 
   nix-shell:
     runs-on: ubuntu-latest

@@ -35,3 +35,14 @@ install(TARGETS wgwatch DESTINATION bin)
 
 enable_testing()
 add_subdirectory(tests)
+
+# Binary packages via `make deb` / `make rpm` (cpack -G DEB/RPM).
+# Runtime deps: DEB via dpkg-shlibdeps, RPM via rpmbuild auto-Requires.
+set(CPACK_PACKAGE_NAME "wgwatch")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_CONTACT "bartman")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Top-like WireGuard monitor")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT")
+set(CPACK_RPM_FILE_NAME "RPM-DEFAULT")
+include(CPack)
