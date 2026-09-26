@@ -53,3 +53,22 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build .#default
       - run: ./result/bin/wgwatch --help
+
+  release:
+    needs: [debian, fedora]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wgwatch-deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: wgwatch-rpm
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.deb
+            *.rpm
