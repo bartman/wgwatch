@@ -26,12 +26,14 @@
 - `vendor/cpptui.hpp`: shim over `_attic/cpptui.hpp` (do not duplicate).
 - `package.nix` / `default.nix`: nix derivation + non-flake entry
   (`nix-build`); flake `packages.default` calls it.
+- `RELEASE.md`: release checklist (bump → tag → push).
 
 ## Rules
 
-- ssh everywhere MUST use `ssh -F /dev/null` (bubblewrap: no `~/.ssh/config`).
 - Makefile wraps cmake only (`cmake -S/-B`, `cmake --build`, `ctest`); the
   `ln -s` for `compile_commands.json` is the one exception.
 - Tests read fixtures from `_attic/` via `WG_ATTIC_DIR`; no `tests/fixtures/`.
 - Trace points use function-form `spdlog::trace` (always compiled); keep
   them to sizes/counts, never key material.
+- `README.md` is user-facing: keep install commands copy-pasteable with
+  exact package filenames; `RELEASE.md` owns the release procedure.
