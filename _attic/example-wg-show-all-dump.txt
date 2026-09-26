@@ -1,0 +1,12 @@
+$ sudo wg show all dump
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    QMAelvvugA5ZzcGZuJLsOOU7galWt6sYCCvG1kbjjGc=    51820   off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  184.146.158.96:44793    10.255.0.2/32   1789913956      241808  220984  off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  204.48.92.236:42012     10.255.0.3/32   1790100385      48148   48828   off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  174.112.220.37:63856    10.255.0.5/32   1790389975      84052660        1738097640      off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  184.148.62.99:51097     10.255.0.7/32   1790388430      658083040       1841830432      off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  (none)  10.255.0.9/32   0       0       0       off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  (none)  10.255.0.10/32  0       0       0       off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  184.146.158.96:52670    10.255.0.11/32  1790377142      12580564        46876796        off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  174.7.184.82:64850      10.255.0.12/32  1790335148      405285380       782442532       off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  217.18.181.173:49667    10.255.0.13/32  1790347091      9355404 24285996        off
+wg0     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=    (none)  217.18.181.173:55815    10.255.0.14/32  1790389944      3467860 5963848 off
