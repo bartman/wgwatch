@@ -1,0 +1,41 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "ninja-debug",
+      "displayName": "Debug (Ninja, -Werror)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-Werror"
+      }
+    },
+    {
+      "name": "ninja-release",
+      "displayName": "Release (Ninja, -O2)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS": "-O2 -DNDEBUG"
+      }
+    },
+    {
+      "name": "ninja-asan",
+      "displayName": "ASan+UBSan (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "ninja-debug", "configurePreset": "ninja-debug" },
+    { "name": "ninja-release", "configurePreset": "ninja-release" },
+    { "name": "ninja-asan", "configurePreset": "ninja-asan" }
+  ]
+}
