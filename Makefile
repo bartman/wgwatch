@@ -7,13 +7,16 @@
 BUILD ?= build
 TYPE ?= release
 
-# Accept CC=g++ as shorthand when CXX is not set.
+# Default to clang++; honor command-line/env CXX; accept CC as shorthand.
+# (Note: make predefines CXX=g++ with origin 'default', so plain ?= would
+# never fire. := under origin-check does.)
 ifeq ($(origin CXX),default)
 ifneq ($(origin CC),default)
 CXX := $(CC)
+else
+CXX := clang++
 endif
 endif
-CXX ?= clang++
 
 ifeq ($(strip $(BUILD)),)
 $(error BUILD must not be empty)

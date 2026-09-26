@@ -12,11 +12,11 @@ fi
 
 if command -v apt-get >/dev/null 2>&1; then
   $SUDO apt-get update && $SUDO apt-get install -y \
-    clang cmake ninja-build pkg-config git ca-certificates \
+    clang g++ cmake ninja-build pkg-config git ca-certificates \
     libev-dev libfmt-dev libspdlog-dev libgtest-dev
 elif command -v dnf >/dev/null 2>&1; then
   $SUDO dnf install -y \
-    clang cmake ninja-build pkg-config git ca-certificates \
+    clang gcc-c++ cmake ninja-build pkg-config git ca-certificates \
     libev-devel fmt-devel spdlog-devel gtest-devel
 else
   msg "no apt-get/dnf found; skipping (use nix develop for deps)"
