@@ -2,25 +2,44 @@
 
 Top-like WireGuard monitor (C++20, CMake+Ninja, clang first).
 
-## Build
+## Quickstart
+
+Debian / Fedora:
 
 ```sh
-# inside the nix dev shell (direnv allow / nix develop)
+./dependencies.sh   # apt/dnf installs: compiler, cmake, ninja, libev, fmt, spdlog, gtest
 make
-make test
+make install        # installs to ~/.local/bin
+wgwatch
 ```
 
-Compiler: no hardcoding — `CXX=clang++` first, `CXX=g++` fallback.
-Other targets: `make clean`, `make distclean`, `make help`.
-Direct cmake also works: presets `ninja-release` (also `ninja-debug`
-with `-Werror`, `ninja-asan`).
-
-`make config` links `./compile_commands.json` to the BUILD dir one for editors.
-
-## Run
+Nix dev shell:
 
 ```sh
-./build/wgwatch [-u SEC] [-i IFACE] [-r [user@]host] [-s TYPE] [-v] [--log FILE] [--show-keys]
+nix develop         # or: direnv allow
+make
+./build/wgwatch
+```
+
+Nix flake (use wgwatch from your own flake / NixOS config):
+
+```nix
+{
+  inputs.wgwatch.url = "github:bartman/wgwatch";
+  # …
+  # outputs: environment.systemPackages = [
+  #   inputs.wgwatch.packages.${system}.default
+  # ];
+}
+```
+
+Without flakes: `nix-build` puts the binary at `./result/bin/wgwatch`
+(see `default.nix`).
+
+## Options
+
+```sh
+wgwatch [-u SEC] [-i IFACE] [-r [user@]host] [-s TYPE] [-v] [--log FILE] [--show-keys]
 ```
 
 - `-u/--update SEC`: refresh interval, 0.1–3600s (default 1.0).
@@ -43,6 +62,7 @@ shows an `ERR` banner instead of freezing silently.
 - `q`: quit (plus Ctrl+C).
 - `k`: toggle key visibility.
 - `s`: cycle peer sort order (shown in the status bar).
-- Header shows peer count and key mode; stale collector shows an `ERR` banner.
+- Header shows origin, peer count, window, and key mode; stale collector
+  shows an `ERR` banner.
 - Peer rows: endpoint, allowed IPs, totals, live rx/tx rates, handshake age
   (green <3min, yellow <10min, red older), and rx/tx braille sparklines.

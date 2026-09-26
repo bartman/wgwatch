@@ -12,6 +12,8 @@
         pkgs = import nixpkgs { inherit system; };
         llvm = pkgs.llvmPackages;
       in {
+        packages.default = pkgs.callPackage ./package.nix { };
+
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             llvm.clang
@@ -30,15 +32,6 @@
             export CXX=${llvm.clang}/bin/clang++
             echo "wgwatch dev shell: clang $(clang --version | head -1)"
           '';
-        };
-
-        packages.default = pkgs.stdenv.mkDerivation {
-          pname = "wgwatch";
-          version = "0.1.0";
-          src = ./.;
-          nativeBuildInputs = with pkgs; [ cmake ninja pkg-config ];
-          buildInputs = with pkgs; [ fmt spdlog gtest libev ];
-          cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" ];
         };
       });
 }

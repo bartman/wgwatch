@@ -27,7 +27,7 @@ else
 $(error TYPE must be release or debug (got '$(TYPE)'))
 endif
 
-.PHONY: all clean distclean test help config
+.PHONY: all clean distclean test install help config
 
 all: config
 	cmake --build $(BUILD)
@@ -51,12 +51,16 @@ distclean:
 test: all
 	ctest --test-dir $(BUILD) --output-on-failure
 
+install: all
+	cmake --install $(BUILD) --prefix $(HOME)/.local
+
 help:
 	@echo "targets:"
 	@echo "  all            build the project (default)"
 	@echo "  clean          clean the binaries"
 	@echo "  distclean      remove BUILD directory"
 	@echo "  test           run unit tests"
+	@echo "  install        install binary in ~/.local/bin"
 	@echo ""
 	@echo "variables:"
 	@echo "  BUILD=build    use a different build directory"

@@ -24,6 +24,8 @@
   main (`-v` → debug, `-vv` → trace, `--log` → file).
 - `cmake/*.cmake`: FetchContent packages (SYSTEM + FIND_PACKAGE_ARGS).
 - `vendor/cpptui.hpp`: shim over `_attic/cpptui.hpp` (do not duplicate).
+- `package.nix` / `default.nix`: nix derivation + non-flake entry
+  (`nix-build`); flake `packages.default` calls it.
 
 ## Rules
 

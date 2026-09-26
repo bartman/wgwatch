@@ -31,5 +31,7 @@ target_link_libraries(wgwatch PRIVATE
   libev::libev
 )
 
+install(TARGETS wgwatch DESTINATION bin)
+
 enable_testing()
 add_subdirectory(tests)
