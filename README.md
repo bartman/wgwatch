@@ -21,15 +21,35 @@ make
 ./build/wgwatch
 ```
 
-Nix flake (use wgwatch from your own flake / NixOS config):
+Nix flake — try it without installing anything:
+
+```sh
+nix run github:bartman/wgwatch -- --help
+```
+
+Use wgwatch from your own flake / NixOS config:
 
 ```nix
 {
-  inputs.wgwatch.url = "github:bartman/wgwatch";
-  # …
-  # outputs: environment.systemPackages = [
-  #   inputs.wgwatch.packages.${system}.default
-  # ];
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    wgwatch.url = "github:bartman/wgwatch";
+  };
+
+  outputs = { nixpkgs, wgwatch, ... }:
+    let system = "x86_64-linux";
+    in {
+      nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          {
+            environment.systemPackages = [
+              wgwatch.packages.${system}.default
+            ];
+          }
+        ];
+      };
+    };
 }
 ```
 
