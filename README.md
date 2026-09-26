@@ -56,6 +56,23 @@ Use wgwatch from your own flake / NixOS config:
 Without flakes: `nix-build` puts the binary at `./result/bin/wgwatch`
 (see `default.nix`).
 
+## Packages
+
+Automated .deb and .rpm builds are available for download and manual install.
+These have not been thoroughly tested.
+
+https://github.com/bartman/wgwatch/releases/latest
+
+On Debian based systems (from the download directory):
+```sh
+sudo apt install ./wgwatch_0.1.0_amd64.deb
+```
+
+On Fedora based systems (from the download directory):
+```sh
+sudo dnf install ./wgwatch-0.1.0-1.x86_64.rpm
+```
+
 ## Options
 
 ```sh

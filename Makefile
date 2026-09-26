@@ -30,7 +30,7 @@ else
 $(error TYPE must be release or debug (got '$(TYPE)'))
 endif
 
-.PHONY: all clean distclean test install help config
+.PHONY: all clean distclean test install deb rpm help config
 
 all: config
 	cmake --build $(BUILD)
@@ -57,6 +57,12 @@ test: all
 install: all
 	cmake --install $(BUILD) --prefix $(HOME)/.local
 
+deb: all
+	cmake -E chdir $(BUILD) cpack -G DEB
+
+rpm: all
+	cmake -E chdir $(BUILD) cpack -G RPM
+
 help:
 	@echo "targets:"
 	@echo "  all            build the project (default)"
@@ -64,6 +70,8 @@ help:
 	@echo "  distclean      remove BUILD directory"
 	@echo "  test           run unit tests"
 	@echo "  install        install binary in ~/.local/bin"
+	@echo "  deb            build .deb package (Debian)"
+	@echo "  rpm            build .rpm package (Fedora)"
 	@echo ""
 	@echo "variables:"
 	@echo "  BUILD=build    use a different build directory"
