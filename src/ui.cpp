@@ -250,7 +250,7 @@ void Ui::refresh(const WgFrame& frame) {
     const auto it = states.find(p.iface + "|" + p.pubkey);
     return it != states.end() ? &it->second : nullptr;
   };
-  const auto plots_row = [&](const WgPeer& p, const PeerState* st) {
+  const auto plots_row = [&](const PeerState* st) {
     auto plots = std::make_shared<cpptui::Horizontal>();
     plots->fixed_height = h;
     auto rx = std::make_shared<PlotWidget>(
@@ -312,7 +312,7 @@ void Ui::refresh(const WgFrame& frame) {
     return line;
   };
   if (!compressed) {
-    for (const auto [begin, end] : runs) {
+    for (const auto& [begin, end] : runs) {
       body->add(iface_label(order[begin]->iface));
       for (std::size_t i = begin; i < end; ++i) {
         const WgPeer& p = *order[i];
@@ -324,14 +324,14 @@ void Ui::refresh(const WgFrame& frame) {
         inner->add(fit_label(info_runs(p, false), inner_w, fg));
         inner->add(fit_label({{ "(" + p.allowed_ips + ")", dim }}, inner_w,
                              dim));
-        inner->add(plots_row(p, st));
+        inner->add(plots_row(st));
         inner->add(stats_row(p, st));
         box->add(inner);
         body->add(box);
       }
     }
   } else {
-    for (const auto [begin, end] : runs) {
+    for (const auto& [begin, end] : runs) {
       body->add(iface_label(order[begin]->iface));
       const int np = static_cast<int>(end - begin);
       auto box = std::make_shared<CompressedBox>(np, h, dim);
@@ -340,7 +340,7 @@ void Ui::refresh(const WgFrame& frame) {
         const WgPeer& p = *order[i];
         const PeerState* st = peer_state(p);
         inner->add(fit_label(info_runs(p, true), inner_w, fg));
-        inner->add(plots_row(p, st));
+        inner->add(plots_row(st));
         inner->add(stats_row(p, st));
         // Blank row reserving the separator line: CompressedBox overpaints
         // it with ├─┤ blended into the outer border.
