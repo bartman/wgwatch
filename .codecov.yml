@@ -1,0 +1,19 @@
+# Codecov repo config. Only takes effect once merged to the default
+# branch (master); validate with:
+#   curl --data-binary @codecov.yml https://codecov.io/validate
+coverage:
+  status:
+    project:
+      default:
+        # Fail the PR only if overall coverage drops >1% vs the base.
+        target: auto
+        threshold: 1%
+        informational: false
+    patch:
+      default:
+        # Advisory only: reports how much of the diff itself is covered
+        # without gating the PR. Flip to false once green is routine.
+        target: auto
+        informational: true
+comment:
+  behavior: default
