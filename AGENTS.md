@@ -27,6 +27,8 @@
 - `cmake/*.cmake`: FetchContent packages (SYSTEM + FIND_PACKAGE_ARGS).
 - `src/theme.hpp`: 12 built-in themes (terminalcolors.com palettes);
   `theme_at()` wraps for the `t` key.
+- `src/unicode_utils.hpp`: braille-dot -> block-octant table (wuni::kOctant)
+  + UTF-8 encoder for the bar plots.
 - `src/config.hpp`: `~/.config/wgwatch/config` load/save (atomic
   rewrite); toggles persist, CLI flags override the file.
 - `tests/fake-wg.py`: fake `wg show all dump` for demos

@@ -48,24 +48,56 @@ TEST(BarRows, FullColumnIsSolid) {
   ASSERT_EQ(rows.size(), 2u);
   for (const auto& r : rows) {
     ASSERT_EQ(r.size(), 4u);
-    for (const char* g : r) EXPECT_STREQ(g, "█");
+    for (const std::string& g : r) EXPECT_EQ(g, "█");
   }
 }
+
+TEST(BarRows, ZeroHistoryIsBlank) {
+  std::array<double, 120> h{};
+  const auto rows = bar_rows(h, 8, 4, 2);
+  ASSERT_EQ(rows.size(), 2u);
+  for (const auto& r : rows)
+    for (const std::string& g : r) EXPECT_EQ(g, " ");
+}
+
 TEST(BarRows, RampRisesLeftToRight) {
   const auto h = ramp(9);
   const auto rows = bar_rows(h, 9, 9, 2);
   ASSERT_EQ(rows.size(), 2u);
-  // Leftmost column (value 0) blank, rightmost (max) solid.
-  EXPECT_STREQ(rows[0][0], " ");
-  EXPECT_STREQ(rows[1][0], " ");
-  EXPECT_STREQ(rows[0][8], "█");
-  EXPECT_STREQ(rows[1][8], "█");
-  // Value 4 of 8 is exactly half: blank on top, solid below.
-  EXPECT_STREQ(rows[0][4], " ");
-  EXPECT_STREQ(rows[1][4], "█");
-  // Value 2 of 8 is a partial block on the bottom row only.
-  EXPECT_STREQ(rows[0][2], " ");
-  EXPECT_STREQ(rows[1][2], "▄");
+  // Leftmost cell (values 0) blank, rightmost cell (max) solid.
+  EXPECT_EQ(rows[0][0], " ");
+  EXPECT_EQ(rows[1][0], " ");
+  EXPECT_EQ(rows[0][8], "█");
+  EXPECT_EQ(rows[1][8], "█");
+  // Value 4 of 8 fills exactly the bottom half: blank above, solid below.
+  EXPECT_EQ(rows[0][4], " ");
+  EXPECT_EQ(rows[1][4], "█");
+}
+
+TEST(BarRows, PartialCellFillsFromBottom) {
+  // Left column full, right column half: bottom row spans both (touching),
+  // top row shows only the full side. Braille dots 123678 -> U+1CDC0.
+  std::array<double, 120> h{};
+  h[0] = 4.0;
+  h[1] = 1.0;
+  const auto rows = bar_rows(h, 2, 1, 1);
+  ASSERT_EQ(rows.size(), 1u);
+  ASSERT_EQ(rows[0].size(), 1u);
+  EXPECT_EQ(rows[0][0], "𜷀");
+}
+
+TEST(BarRows, TrueZeroGapSurvives) {
+  // A zero bucket between non-zeros stays blank; neighbors stay solid.
+  std::array<double, 120> h{};
+  h[0] = 1.0;
+  h[1] = 0.0;
+  h[2] = 1.0;
+  const auto rows = bar_rows(h, 3, 3, 1);
+  ASSERT_EQ(rows.size(), 1u);
+  ASSERT_EQ(rows[0].size(), 3u);
+  EXPECT_EQ(rows[0][0], "█");
+  EXPECT_EQ(rows[0][1], " ");
+  EXPECT_EQ(rows[0][2], "█");
 }
 
 TEST(PlotMode, ToggleAndName) {

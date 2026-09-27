@@ -104,7 +104,7 @@ shows an `ERR` banner instead of freezing silently.
 - `k`: toggle key visibility.
 - `s`: cycle peer sort order (shown in the footer).
 - `i`: toggle inactive peers (never handshook) shown/hidden.
-- `p`: toggle plot style (`line` braille vs `bar` blocks).
+- `p`: toggle plot style (`line` traces braille, `bar` fills octant blocks).
 - `t`: cycle theme (catppuccin-mocha, dracula, nord, gruvbox-dark,
   tokyo-night, solarized-dark, github-dark, shades-of-purple, rose-pine,
   kanagawa-wave, everforest-dark, one-dark).

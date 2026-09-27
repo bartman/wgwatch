@@ -14,6 +14,7 @@
 #include "parser.hpp"
 #include "rates.hpp"
 #include "theme.hpp"
+#include "unicode_utils.hpp"
 
 // Plot height (normal mode): every peer box costs 5 fixed lines (top/bottom
 // border, info, allowed-ips, stats) plus h plot lines; each interface run
@@ -98,44 +99,69 @@ inline cpptui::StyledText to_styled(const std::vector<TextRun>& runs) {
   return st;
 }
 
-// Bar plot cells, top row first: rows[r][x] is one glyph (" ", a partial
-// eighth-block, or "█"). Empty cells stay " " (the widget paints the black
-// background underneath). Pure: unit-tested.
-inline std::vector<std::vector<const char*>> bar_rows(
+// Bar plot cells at octant resolution: each cell covers 2 sample columns
+// x 4 sub-rows (4x the vertical and 2x the horizontal resolution of
+// whole-cell blocks). Bars fill from the measured level down, so every
+// cell is blank, full (U+2588), or one bottom-filled partial from
+// wuni::kOctant; horizontally adjacent non-empty buckets always touch,
+// and only true data zeros leave gaps. Empty cells stay " " (the widget
+// paints the black background underneath). Pure: unit-tested.
+inline std::vector<std::vector<std::string>> bar_rows(
     const std::array<double, 120>& hist, std::size_t n, int width,
     int height) {
-  std::vector<std::vector<const char*>> rows;
+  std::vector<std::vector<std::string>> rows;
   if (n < 1 || width <= 0 || height <= 0) return rows;
   double maxv = 0.0;
   for (std::size_t i = 0; i < n; ++i) maxv = std::max(maxv, hist[i]);
   if (maxv <= 0.0) maxv = 1.0;
-  static constexpr const char* kParts[8] = {" ", "▁", "▂", "▃",
-                                            "▄", "▅", "▆", "▇"};
+  const int cols = width * 2;
+  const int sub = height * 4;
+  // Max-downsample so spikes survive: bucket b covers
+  // hist [b*n/cols, (b+1)*n/cols). Buckets narrower than one sample
+  // reuse their sample; the result still touches.
+  std::vector<double> level(static_cast<std::size_t>(cols), 0.0);
+  for (int b = 0; b < cols; ++b) {
+    std::size_t i0 =
+        static_cast<std::size_t>(b) * n / static_cast<std::size_t>(cols);
+    std::size_t i1 = static_cast<std::size_t>(b + 1) * n /
+                     static_cast<std::size_t>(cols);
+    if (i1 > n) i1 = n;
+    double m = 0.0;
+    for (std::size_t i = i0; i < i1; ++i) m = std::max(m, hist[i]);
+    if (i1 <= i0 && i0 < n) m = hist[i0];
+    level[static_cast<std::size_t>(b)] = m;
+  }
   rows.assign(static_cast<std::size_t>(height),
-              std::vector<const char*>(static_cast<std::size_t>(width), " "));
-  const int span = width > 1 ? width - 1 : 1;
-  for (int x = 0; x < width; ++x) {
-    const std::size_t idx =
-        (n <= 1) ? 0 : static_cast<std::size_t>(x * (n - 1) / span);
-    const long eighths =
-        std::lround(hist[idx] / maxv * height * 8.0);
-    const long full = eighths / 8;
-    const long rem = eighths % 8;
-    for (int r = 0; r < height; ++r) {
-      const long from_bottom = height - 1 - r;
-      if (from_bottom < full)
-        rows[static_cast<std::size_t>(r)][static_cast<std::size_t>(x)] = "█";
-      else if (from_bottom == full && rem > 0)
-        rows[static_cast<std::size_t>(r)][static_cast<std::size_t>(x)] =
-            kParts[rem];
+              std::vector<std::string>(static_cast<std::size_t>(width), " "));
+  for (int cx = 0; cx < width; ++cx) {
+    for (int cy = 0; cy < height; ++cy) {
+      int pat = 0;
+      for (int sx = 0; sx < 2; ++sx) {
+        const double v =
+            level[static_cast<std::size_t>(cx * 2 + sx)];
+        long fill = v <= 0.0 ? 0 : std::lround(v / maxv * sub);
+        if (fill > sub) fill = sub;
+        for (int sr = 0; sr < 4; ++sr) {
+          if (cy * 4 + sr >= sub - fill) {
+            // Braille dots: rows 0-2 are bits r / r+3 per column,
+            // row 3 is bits 6 / 7.
+            const int bit =
+                (sr < 3) ? (sr + (sx != 0 ? 3 : 0)) : (sx != 0 ? 7 : 6);
+            pat |= 1 << bit;
+          }
+        }
+      }
+      if (pat == 0) continue;
+      rows[static_cast<std::size_t>(cy)][static_cast<std::size_t>(cx)] =
+          wuni::utf8_encode(wuni::kOctant[pat]);
     }
   }
   return rows;
 }
 
 // One directed plot (rx or tx) confined to its own region. Line mode draws
-// the braille line plot; bar mode stacks unicode blocks. The region is a
-// solid black rectangle; the graph draws over it.
+// the braille line plot; bar mode fills octant block bars (2x4 resolution).
+// The region is a solid black rectangle; the graph draws over it.
 class PlotWidget : public cpptui::Widget {
  public:
   PlotWidget(std::array<double, 120> hist, std::size_t n, PlotMode mode,
