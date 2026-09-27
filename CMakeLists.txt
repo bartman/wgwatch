@@ -30,6 +30,7 @@ target_link_libraries(wgwatch PRIVATE
   spdlog::spdlog
   libev::libev
 )
+target_compile_definitions(wgwatch PRIVATE WGWATCH_VERSION="${PROJECT_VERSION}")
 
 install(TARGETS wgwatch DESTINATION bin)
 

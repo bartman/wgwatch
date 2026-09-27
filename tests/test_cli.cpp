@@ -141,3 +141,9 @@ TEST(Cli, HideInactive) {
   EXPECT_FALSE(run({"wgwatch"}).hide_inactive);
   EXPECT_TRUE(run({"wgwatch", "--hide-inactive"}).hide_inactive);
 }
+
+TEST(Cli, VersionThrowsAndFormats) {
+  EXPECT_THROW(run({"wgwatch", "--version"}), VersionRequested);
+  EXPECT_EQ(version_string(), "wgwatch " WGWATCH_VERSION);
+  EXPECT_NE(version_string().find("wgwatch "), std::string::npos);
+}

@@ -9,6 +9,7 @@ std::string usage() {
   return "wgwatch — top-like WireGuard monitor\n"
          "\n"
          "  -h --help                   this help\n"
+         "  --version                   print version and exit\n"
          "  -r --remote [user@]host     access stats remotely via ssh (default "
          "local)\n"
          "  -u --update <sec>           frequence of display update (default "
@@ -26,6 +27,15 @@ std::string usage() {
          "  --theme <name>              color theme (default catppuccin-mocha)\n"
          "  --inactive <mode>           hide|show peers that never handshook\n"
          "  --public-keys <mode>        show|hide WireGuard keys\n";
+}
+
+std::string version_string() {
+// CMake sets WGWATCH_VERSION for both targets; the fallback keeps
+// ad-hoc compiles (editors, single-file builds) working.
+#ifndef WGWATCH_VERSION
+#define WGWATCH_VERSION "dev"
+#endif
+  return "wgwatch " WGWATCH_VERSION;
 }
 
 std::string sort_help() {
@@ -149,6 +159,8 @@ CliOptions parse_cli(int argc, char* argv[], CliOptions base) {
     const std::string a = argv[i];
     if (a == "-h" || a == "--help") {
       throw HelpRequested{};
+    } else if (a == "--version") {
+      throw VersionRequested{};
     } else if (a == "--show-keys") {
       o.show_keys = true;
     } else if (a == "--hide-inactive") {

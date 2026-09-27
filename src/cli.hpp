@@ -42,13 +42,16 @@ struct CliOptions {
 struct HelpRequested {};
 // Thrown for --sort help (main prints sort_help(), exits 0).
 struct SortHelpRequested {};
+// Thrown for --version (main prints version_string(), exits 0).
+struct VersionRequested {};
 
 // Flags present on argv overwrite base; absent ones keep base values.
 // Lets the config file provide defaults that CLI overrides.
 CliOptions parse_cli(int argc, char* argv[],
                       CliOptions base = CliOptions{});
-std::string usage();      // full --help text
-std::string sort_help();  // sort type list for --sort help
+std::string usage();           // full --help text
+std::string version_string();  // "wgwatch X.Y.Z"
+std::string sort_help();       // sort type list for --sort help
 std::string sort_name(SortKey s);
 SortKey next_sort(SortKey s);  // cycle order for the 's' key
 std::string plot_name(PlotMode m);

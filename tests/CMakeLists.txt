@@ -22,6 +22,8 @@ target_link_libraries(wgwatch_tests PRIVATE
   fmt::fmt
   spdlog::spdlog
 )
+target_compile_definitions(wgwatch_tests PRIVATE
+  WGWATCH_VERSION="${PROJECT_VERSION}")
 # Tests read the checked-in example dump straight from _attic (no copy).
 target_compile_definitions(wgwatch_tests PRIVATE
   WG_ATTIC_DIR="${CMAKE_SOURCE_DIR}/_attic"

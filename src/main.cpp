@@ -73,6 +73,9 @@ int main(int argc, char* argv[]) {
   } catch (const SortHelpRequested&) {
     fmt::print("{}", sort_help());
     return 0;
+  } catch (const VersionRequested&) {
+    fmt::print("{}\n", version_string());
+    return 0;
   } catch (const std::exception& e) {
     spdlog::error("{}", e.what());
     return 1;
