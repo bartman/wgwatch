@@ -10,6 +10,9 @@ void RateTracker::ingest(const WgFrame& f) {
   for (const WgPeer& p : f.peers) {
     const std::string key = p.iface + "|" + p.pubkey;
     PeerState& st = peers_[key];
+    // Only a frame with a baseline yields a measurement; the very first
+    // frame (or a stalled clock) sets the baseline but records no sample,
+    // so histories never start with a phantom zero.
     if (st.last_t >= 0.0 && f.tstamp > st.last_t) {
       const double dt = f.tstamp - st.last_t;
       st.rx_rate = (p.rx >= st.last_rx)
@@ -18,24 +21,24 @@ void RateTracker::ingest(const WgFrame& f) {
       st.tx_rate = (p.tx >= st.last_tx)
                        ? static_cast<double>(p.tx - st.last_tx) / dt
                        : 0.0;
+      if (st.n < st.rx_hist.size()) {
+        st.rx_hist[st.n] = st.rx_rate;
+        st.tx_hist[st.n] = st.tx_rate;
+        st.t_hist[st.n] = f.tstamp;
+        ++st.n;
+      } else {
+        for (std::size_t i = 1; i < st.rx_hist.size(); ++i) {
+          st.rx_hist[i - 1] = st.rx_hist[i];
+          st.tx_hist[i - 1] = st.tx_hist[i];
+          st.t_hist[i - 1] = st.t_hist[i];
+        }
+        st.rx_hist.back() = st.rx_rate;
+        st.tx_hist.back() = st.tx_rate;
+        st.t_hist.back() = f.tstamp;
+      }
     } else {
       st.rx_rate = 0.0;
       st.tx_rate = 0.0;
-    }
-    if (st.n < st.rx_hist.size()) {
-      st.rx_hist[st.n] = st.rx_rate;
-      st.tx_hist[st.n] = st.tx_rate;
-      st.t_hist[st.n] = f.tstamp;
-      ++st.n;
-    } else {
-      for (std::size_t i = 1; i < st.rx_hist.size(); ++i) {
-        st.rx_hist[i - 1] = st.rx_hist[i];
-        st.tx_hist[i - 1] = st.tx_hist[i];
-        st.t_hist[i - 1] = st.t_hist[i];
-      }
-      st.rx_hist.back() = st.rx_rate;
-      st.tx_hist.back() = st.tx_rate;
-      st.t_hist.back() = f.tstamp;
     }
     st.cur = p;
     st.last_rx = p.rx;

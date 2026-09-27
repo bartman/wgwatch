@@ -25,6 +25,7 @@ TEST(Rates, FirstFrameZero) {
   ASSERT_EQ(m.count("wg0|k1"), 1u);
   EXPECT_DOUBLE_EQ(m.at("wg0|k1").rx_rate, 0.0);
   EXPECT_DOUBLE_EQ(m.at("wg0|k1").tx_rate, 0.0);
+  EXPECT_EQ(m.at("wg0|k1").n, 0u);  // baseline only, no phantom sample
 }
 
 TEST(Rates, DeltaOverDt) {
@@ -34,7 +35,7 @@ TEST(Rates, DeltaOverDt) {
   const auto m = tr.peers();
   EXPECT_DOUBLE_EQ(m.at("wg0|k1").rx_rate, 100.0);
   EXPECT_DOUBLE_EQ(m.at("wg0|k1").tx_rate, 200.0);
-  EXPECT_EQ(m.at("wg0|k1").n, 2u);
+  EXPECT_EQ(m.at("wg0|k1").n, 1u);
 }
 
 TEST(Rates, CounterResetClampsToZero) {
@@ -66,7 +67,7 @@ TEST(Rates, HistorySpanGrowsThenCaps) {
     f.peers.push_back(p);
     tr.ingest(f);
   }
-  EXPECT_DOUBLE_EQ(tr.history_span(), 4.0);
+  EXPECT_DOUBLE_EQ(tr.history_span(), 3.0);
   for (int i = 5; i < 130; ++i) {
     WgFrame f;
     f.tstamp = 100.0 + i;
@@ -77,7 +78,7 @@ TEST(Rates, HistorySpanGrowsThenCaps) {
     f.peers.push_back(p);
     tr.ingest(f);
   }
-  // 130 frames at 1s: oldest 10 dropped, window 110..229 frozen at 119s.
+  // 130 frames at 1s: 129 samples, oldest 9 dropped, window frozen at 119s.
   EXPECT_EQ(tr.peers().at("wg0|k").n, 120u);
   EXPECT_DOUBLE_EQ(tr.history_span(), 119.0);
 }
