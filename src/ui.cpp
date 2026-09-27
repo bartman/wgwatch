@@ -17,11 +17,13 @@
 
 namespace {
 
-int term_rows() {
+// {cols, rows}; 80x24 fallback when stdout is not a terminal.
+std::pair<int, int> term_size() {
   struct winsize w {};
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_row > 0)
-    return w.ws_row;
-  return 24;
+  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_row > 0 &&
+      w.ws_col > 0)
+    return {w.ws_col, w.ws_row};
+  return {80, 24};
 }
 
 std::string hidden_key(const std::string& key, bool show) {
@@ -140,25 +142,36 @@ void Ui::refresh(const WgFrame& frame) {
   const cpptui::Color wac = wtheme::color(th.warn);
   const cpptui::Color erc = wtheme::color(th.err);
 
+  const auto [term_cols, term_rows] = term_size();
   root_->clear_children();
-  header_->set_text(cpptui::StyledText(fmt::format(
-      "wgwatch | {} | {} peers | last {} shown",
-      opts_->remote ? *opts_->remote : std::string("local"),
-      frame.peers.size(), wfmt::fmt_span(tracker_->history_span()))));
+  header_->set_text(to_styled(fit_runs(
+      {{fmt::format("wgwatch | {} | {} peers | last {} shown",
+                     opts_->remote ? *opts_->remote : std::string("local"),
+                     frame.peers.size(),
+                     wfmt::fmt_span(tracker_->history_span())),
+        hdc}},
+      term_cols)));
   header_->fg_color = hdc;
   root_->add(header_);
+  // Flex body between the fixed header/footer: on overflow the body clips
+  // internally, so the footer (key hints) is never pushed off-screen.
+  auto body = std::make_shared<cpptui::Vertical>();
+  root_->add(body);
   const auto add_footer = [&] {
-    footer_->set_text(cpptui::StyledText(fmt::format(
-        "q quit, s sort ({}), p plot ({}), t theme ({}), i inactive ({}), k "
-        "keys ({})",
-        sort_name(opts_->sort), plot_name(opts_->plot_mode), th.name,
-        opts_->hide_inactive ? "hidden" : "shown",
-        opts_->show_keys ? "shown" : "hidden")));
+    footer_->set_text(to_styled(fit_runs(
+        {{fmt::format(
+              "q quit, s sort ({}), p plot ({}), t theme ({}), i inactive "
+              "({}), k keys ({})",
+              sort_name(opts_->sort), plot_name(opts_->plot_mode), th.name,
+              opts_->hide_inactive ? "hidden" : "shown",
+              opts_->show_keys ? "shown" : "hidden"),
+          dim}},
+        term_cols)));
     footer_->fg_color = dim;
     root_->add(footer_);
   };
   if (frame.stale) {
-    root_->add(std::make_shared<cpptui::Label>(
+    body->add(std::make_shared<cpptui::Label>(
         cpptui::StyledText().colored(
             "ERR: no data from collector for 3s+ (wg missing? privileges?)",
             erc)));
@@ -178,106 +191,165 @@ void Ui::refresh(const WgFrame& frame) {
                 order.end());
   std::map<std::string, const WgIface*> ifaces;
   for (const WgIface& fi : frame.ifaces) ifaces[fi.name] = &fi;
-  // Header lines actually emitted: one per interface transition in display
-  // order (non-native sorts can repeat an interface).
-  int n_ifaces = 0;
-  for (std::size_t i = 0; i < order.size(); ++i) {
-    if (i == 0 || order[i]->iface != order[i - 1]->iface) ++n_ifaces;
+  // Consecutive same-interface runs: one header line each, and one shared
+  // box each in compressed mode (non-native sorts can repeat an iface).
+  std::vector<std::pair<std::size_t, std::size_t>> runs;
+  for (std::size_t i = 0; i < order.size();) {
+    std::size_t j = i + 1;
+    while (j < order.size() && order[j]->iface == order[i]->iface) ++j;
+    runs.emplace_back(i, j);
+    i = j;
   }
-  const int h = plot_height_for(term_rows(), n_ifaces,
-                                static_cast<int>(order.size()));
-  std::string cur_iface;
-  bool first_iface = true;
-  for (const WgPeer* pp : order) {
-    const WgPeer& p = *pp;
-    if (first_iface || p.iface != cur_iface) {
-      cur_iface = p.iface;
-      first_iface = false;
-      const auto it = ifaces.find(p.iface);
-      const std::string port =
-          (it != ifaces.end() && it->second->port != 0)
-              ? std::to_string(it->second->port)
-              : "off";
-      const std::string ikey =
-          (it != ifaces.end())
-              ? hidden_key(it->second->pubkey, opts_->show_keys)
-              : "{hidden}";
-      root_->add(std::make_shared<cpptui::Label>(
-          cpptui::StyledText(
-              fmt::format("{} port={} key={}", p.iface, port, ikey)),
-          hdc));
-    }
-    const auto it = states.find(p.iface + "|" + p.pubkey);
-    const WindowStats rxw = it != states.end()
-                                ? window_stats(it->second.rx_hist,
-                                               it->second.n)
-                                : WindowStats{};
-    const WindowStats txw = it != states.end()
-                                ? window_stats(it->second.tx_hist,
-                                               it->second.n)
-                                : WindowStats{};
+  const int n_peers = static_cast<int>(order.size());
+  const int n_runs = static_cast<int>(runs.size());
+  const int h_normal = plot_height_for(term_rows, n_runs, n_peers);
+  // Small screen, many peers: compressed shares box borders between peers
+  // (1 line, not 2) and merges allowed-IPs into the info line.
+  const bool compressed =
+      n_peers > 0 && term_rows < 2 + n_runs + n_peers * (5 + h_normal);
+  const int h = compressed
+                    ? compressed_plot_height(term_rows, n_runs, n_peers)
+                    : h_normal;
+  // Pre-truncation widths: box content is term_cols - 2, and each stats
+  // cell mirrors its plot's flex share (remainder goes left, as flex does).
+  const int inner_w = term_cols - 2;
+  const int avail = inner_w - 3;
+  const int rx_w = avail / 2 + avail % 2;
+  const int tx_w = avail / 2;
+  const auto fit_label = [&](std::vector<TextRun> line, int w,
+                             cpptui::Color c) {
+    return std::make_shared<cpptui::Label>(
+        to_styled(fit_runs(std::move(line), w)), c);
+  };
+  const auto handshake = [&](const WgPeer& p) {
+    if (p.handshake == 0) return std::make_pair(std::string("never"), erc);
+    const double age = std::difftime(
+        std::time(nullptr), static_cast<time_t>(p.handshake));
     cpptui::Color hc = erc;
-    std::string ago = "never";
-    if (p.handshake != 0) {
-      const double age = std::difftime(
-          std::time(nullptr), static_cast<time_t>(p.handshake));
-      ago = wfmt::fmt_ago(age);
-      if (age < 180.0)
-        hc = okc;
-      else if (age < 600.0)
-        hc = wac;
-    }
-    auto box =
-        std::make_shared<cpptui::Border>(cpptui::BorderStyle::Single, dim);
-    box->fixed_height = 5 + h;
-    auto inner = std::make_shared<cpptui::Vertical>();
-    cpptui::StyledText info;
-    info.add(fmt::format("{}   handshake:", p.endpoint.empty() ? "(none)"
-                                                              : p.endpoint));
-    info.colored(ago, hc);
-    info.add("   key:");
-    info.colored(hidden_key(p.pubkey, opts_->show_keys), fg);
-    inner->add(std::make_shared<cpptui::Label>(info, fg));
-    inner->add(std::make_shared<cpptui::Label>(
-        cpptui::StyledText(fmt::format("({})", p.allowed_ips)), dim));
+    if (age < 180.0)
+      hc = okc;
+    else if (age < 600.0)
+      hc = wac;
+    return std::make_pair(wfmt::fmt_ago(age), hc);
+  };
+  const auto iface_label = [&](const std::string& name) {
+    const auto it = ifaces.find(name);
+    const std::string port =
+        (it != ifaces.end() && it->second->port != 0)
+            ? std::to_string(it->second->port)
+            : "off";
+    const std::string ikey =
+        (it != ifaces.end())
+            ? hidden_key(it->second->pubkey, opts_->show_keys)
+            : "{hidden}";
+    return fit_label(
+        {{fmt::format("{} port={} key={}", name, port, ikey), hdc}},
+        term_cols, hdc);
+  };
+  const auto peer_state = [&](const WgPeer& p) -> const PeerState* {
+    const auto it = states.find(p.iface + "|" + p.pubkey);
+    return it != states.end() ? &it->second : nullptr;
+  };
+  const auto plots_row = [&](const WgPeer& p, const PeerState* st) {
     auto plots = std::make_shared<cpptui::Horizontal>();
     plots->fixed_height = h;
     auto rx = std::make_shared<PlotWidget>(
-        it != states.end() ? it->second.rx_hist : std::array<double, 120>{},
-        it != states.end() ? it->second.n : 0, opts_->plot_mode, rxc);
+        st ? st->rx_hist : std::array<double, 120>{}, st ? st->n : 0,
+        opts_->plot_mode, rxc);
     rx->fixed_height = h;
     auto gap = std::make_shared<cpptui::Label>(cpptui::StyledText("   "));
     gap->fixed_width = 3;
     auto tx = std::make_shared<PlotWidget>(
-        it != states.end() ? it->second.tx_hist : std::array<double, 120>{},
-        it != states.end() ? it->second.n : 0, opts_->plot_mode, txc);
+        st ? st->tx_hist : std::array<double, 120>{}, st ? st->n : 0,
+        opts_->plot_mode, txc);
     tx->fixed_height = h;
     plots->add(rx);
     plots->add(gap);
     plots->add(tx);
-    inner->add(plots);
-    // Stats row mirrors the plots row geometry (flex / 3-gap / flex) so
-    // "tx" starts exactly under the right-hand plot.
-    auto stats_row = std::make_shared<cpptui::Horizontal>();
-    stats_row->fixed_height = 1;
-    cpptui::StyledText rx_stats;
-    rx_stats.add(" rx ");
-    rx_stats.colored(wfmt::fmt_bytes(p.rx), rxc);
-    rx_stats.add(fmt::format(", avg {}, peak {}", wfmt::fmt_rate(rxw.avg),
-                             wfmt::fmt_rate(rxw.peak)));
-    stats_row->add(std::make_shared<cpptui::Label>(rx_stats, fg));
-    auto stats_gap = std::make_shared<cpptui::Label>(cpptui::StyledText("   "));
-    stats_gap->fixed_width = 3;
-    stats_row->add(stats_gap);
-    cpptui::StyledText tx_stats;
-    tx_stats.add(" tx ");
-    tx_stats.colored(wfmt::fmt_bytes(p.tx), txc);
-    tx_stats.add(fmt::format(", avg {}, peak {}", wfmt::fmt_rate(txw.avg),
-                             wfmt::fmt_rate(txw.peak)));
-    stats_row->add(std::make_shared<cpptui::Label>(tx_stats, fg));
-    inner->add(stats_row);
-    box->add(inner);
-    root_->add(box);
+    return plots;
+  };
+  const auto stats_row = [&](const WgPeer& p, const PeerState* st) {
+    const WindowStats rxw =
+        st ? window_stats(st->rx_hist, st->n) : WindowStats{};
+    const WindowStats txw =
+        st ? window_stats(st->tx_hist, st->n) : WindowStats{};
+    auto row = std::make_shared<cpptui::Horizontal>();
+    row->fixed_height = 1;
+    row->add(fit_label({{" rx ", std::nullopt},
+                        {wfmt::fmt_bytes(p.rx), rxc},
+                        {fmt::format(", avg {}, peak {}",
+                                     wfmt::fmt_rate(rxw.avg),
+                                     wfmt::fmt_rate(rxw.peak)),
+                         std::nullopt}},
+                       rx_w, fg));
+    auto gap = std::make_shared<cpptui::Label>(cpptui::StyledText("   "));
+    gap->fixed_width = 3;
+    row->add(gap);
+    row->add(fit_label({{" tx ", std::nullopt},
+                        {wfmt::fmt_bytes(p.tx), txc},
+                        {fmt::format(", avg {}, peak {}",
+                                     wfmt::fmt_rate(txw.avg),
+                                     wfmt::fmt_rate(txw.peak)),
+                         std::nullopt}},
+                       tx_w, fg));
+    return row;
+  };
+  const auto info_runs = [&](const WgPeer& p, bool merged) {
+    const auto [ago, hc] = handshake(p);
+    std::vector<TextRun> line = {
+        {fmt::format("{}   handshake:",
+                     p.endpoint.empty() ? "(none)" : p.endpoint),
+         std::nullopt},
+        {ago, hc},
+        {"   key:", std::nullopt},
+        {hidden_key(p.pubkey, opts_->show_keys), fg},
+    };
+    if (merged) {
+      line.push_back({"  (", std::nullopt});
+      line.push_back({p.allowed_ips, dim});
+      line.push_back({")", std::nullopt});
+    }
+    return line;
+  };
+  if (!compressed) {
+    for (const auto [begin, end] : runs) {
+      body->add(iface_label(order[begin]->iface));
+      for (std::size_t i = begin; i < end; ++i) {
+        const WgPeer& p = *order[i];
+        const PeerState* st = peer_state(p);
+        auto box =
+            std::make_shared<cpptui::Border>(cpptui::BorderStyle::Single, dim);
+        box->fixed_height = 5 + h;
+        auto inner = std::make_shared<cpptui::Vertical>();
+        inner->add(fit_label(info_runs(p, false), inner_w, fg));
+        inner->add(fit_label({{ "(" + p.allowed_ips + ")", dim }}, inner_w,
+                             dim));
+        inner->add(plots_row(p, st));
+        inner->add(stats_row(p, st));
+        box->add(inner);
+        body->add(box);
+      }
+    }
+  } else {
+    for (const auto [begin, end] : runs) {
+      body->add(iface_label(order[begin]->iface));
+      const int np = static_cast<int>(end - begin);
+      auto box = std::make_shared<CompressedBox>(np, h, dim);
+      auto inner = std::make_shared<cpptui::Vertical>();
+      for (std::size_t i = begin; i < end; ++i) {
+        const WgPeer& p = *order[i];
+        const PeerState* st = peer_state(p);
+        inner->add(fit_label(info_runs(p, true), inner_w, fg));
+        inner->add(plots_row(p, st));
+        inner->add(stats_row(p, st));
+        // Blank row reserving the separator line: CompressedBox overpaints
+        // it with ├─┤ blended into the outer border.
+        if (i + 1 < end)
+          inner->add(std::make_shared<cpptui::Label>(cpptui::StyledText("")));
+      }
+      box->add(inner);
+      body->add(box);
+    }
   }
   add_footer();
 }

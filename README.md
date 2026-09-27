@@ -110,7 +110,8 @@ shows an `ERR` banner instead of freezing silently.
 - Each peer gets a box: endpoint, handshake age (green <3min, yellow
   <10min, red older), key, allowed IPs, side-by-side rx/tx plots, and
   totals with window avg/peak rates. Plot height (1–4 lines) scales to
-  fit the terminal.
+  fit the terminal; when peers still overflow, boxes compress (shared
+  separators, merged info line) and long lines truncate with ….
 
 ## Config
 

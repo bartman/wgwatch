@@ -81,13 +81,13 @@ TEST(PlotMode, Defaults) {
   EXPECT_EQ(o.theme, 0u);
 }
 
-WgFrame synthetic_frame(double t, uint64_t rx_base) {
+WgFrame synthetic_frame(double t, uint64_t rx_base, int n_peers = 2) {
   WgFrame f;
   f.tstamp = t;
   f.ifaces.push_back(
       WgIface{"wr0", "iface-priv", "iface-pub", 51820});
   const auto now = static_cast<uint64_t>(std::time(nullptr));
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < n_peers; ++i) {
     WgPeer p;
     p.iface = "wr0";
     p.pubkey = "peer" + std::to_string(i);
@@ -112,13 +112,19 @@ TEST(Refresh, BoxesPeersWithHeaderAndFooter) {
   const auto root =
       std::dynamic_pointer_cast<cpptui::Container>(ui.root());
   ASSERT_NE(root, nullptr);
-  // header, one interface line, two peer boxes, footer.
+  // header, flex body (interface line + two peer boxes), footer.
   const auto& kids = root->get_children();
-  ASSERT_EQ(kids.size(), 5u);
+  ASSERT_EQ(kids.size(), 3u);
   EXPECT_NE(std::dynamic_pointer_cast<cpptui::Label>(kids[0]), nullptr);
-  EXPECT_NE(std::dynamic_pointer_cast<cpptui::Label>(kids[1]), nullptr);
-  const auto box0 = std::dynamic_pointer_cast<cpptui::Border>(kids[2]);
-  const auto box1 = std::dynamic_pointer_cast<cpptui::Border>(kids[3]);
+  EXPECT_NE(std::dynamic_pointer_cast<cpptui::Label>(kids[2]), nullptr);
+  const auto body =
+      std::dynamic_pointer_cast<cpptui::Container>(kids[1]);
+  ASSERT_NE(body, nullptr);
+  const auto& content = body->get_children();
+  ASSERT_EQ(content.size(), 3u);
+  EXPECT_NE(std::dynamic_pointer_cast<cpptui::Label>(content[0]), nullptr);
+  const auto box0 = std::dynamic_pointer_cast<cpptui::Border>(content[1]);
+  const auto box1 = std::dynamic_pointer_cast<cpptui::Border>(content[2]);
   ASSERT_NE(box0, nullptr);
   ASSERT_NE(box1, nullptr);
   EXPECT_EQ(box0->fixed_height, box1->fixed_height);
@@ -140,7 +146,6 @@ TEST(Refresh, BoxesPeersWithHeaderAndFooter) {
     EXPECT_EQ(hrow->get_children()[0]->fixed_width, 0);
     EXPECT_EQ(hrow->get_children()[2]->fixed_width, 0);
   }
-  EXPECT_NE(std::dynamic_pointer_cast<cpptui::Label>(kids[4]), nullptr);
 }
 
 TEST(Refresh, StaleFrameShowsErrAndFooter) {
@@ -154,7 +159,13 @@ TEST(Refresh, StaleFrameShowsErrAndFooter) {
   const auto root =
       std::dynamic_pointer_cast<cpptui::Container>(ui.root());
   ASSERT_NE(root, nullptr);
-  EXPECT_EQ(root->get_children().size(), 3u);
+  // header, flex body holding the ERR line, footer.
+  const auto& kids = root->get_children();
+  ASSERT_EQ(kids.size(), 3u);
+  const auto body =
+      std::dynamic_pointer_cast<cpptui::Container>(kids[1]);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->get_children().size(), 1u);
 }
 
 }  // namespace
@@ -173,9 +184,128 @@ TEST(Refresh, HideInactiveFiltersNeverHandshook) {
     ui.refresh(frame);
     const auto root =
         std::dynamic_pointer_cast<cpptui::Container>(ui.root());
-    return root->get_children().size();
+    const auto body = std::dynamic_pointer_cast<cpptui::Container>(
+        root->get_children()[1]);
+    return body->get_children().size();
   };
-  // header, iface, two boxes, footer vs one box hidden.
-  EXPECT_EQ(count_boxes(false), 5u);
-  EXPECT_EQ(count_boxes(true), 4u);
+  // iface + two boxes vs one box hidden (inside the flex body).
+  EXPECT_EQ(count_boxes(false), 3u);
+  EXPECT_EQ(count_boxes(true), 2u);
+}
+
+TEST(CompressedHeight, ExactFitMath) {
+  // 2 chrome + 2*1 run + 3*2 fixed + 2*h <= 12 -> h = 1.
+  EXPECT_EQ(compressed_plot_height(12, 1, 2), 1);
+  // (40 - 2 - 2 - 6) / 2 = 15 -> clamp 4.
+  EXPECT_EQ(compressed_plot_height(40, 1, 2), 4);
+  EXPECT_EQ(compressed_plot_height(8, 1, 5), 1);
+  EXPECT_EQ(compressed_plot_height(24, 0, 0), 4);
+}
+
+TEST(FitText, FitsUnchangedEllipsizesOverflow) {
+  EXPECT_EQ(fit_text("abcdef", 10), "abcdef");
+  EXPECT_EQ(fit_text("abcdef", 6), "abcdef");
+  EXPECT_EQ(fit_text("abcdef", 5), "abcd…");
+  EXPECT_EQ(fit_text("abcdef", 1), "…");
+  EXPECT_EQ(fit_text("abcdef", 0), "");
+  EXPECT_EQ(fit_text("a…b", 3), "a…b");
+  EXPECT_EQ(fit_text("a…b", 2), "a…");
+}
+
+TEST(FitRuns, CutsInsideRunKeepingColor) {
+  const cpptui::Color red = cpptui::Color::Red();
+  const auto out =
+      fit_runs({{"ab", red}, {"cdef", std::nullopt}}, 4);
+  ASSERT_EQ(out.size(), 2u);
+  EXPECT_EQ(out[0].text, "ab");
+  EXPECT_TRUE(out[0].fg.has_value());
+  EXPECT_EQ(out[1].text, "c…");
+  EXPECT_FALSE(out[1].fg.has_value());
+}
+
+TEST(FitRuns, AllFitPassesThrough) {
+  const cpptui::Color red = cpptui::Color::Red();
+  const auto out =
+      fit_runs({{"ab", red}, {"cdef", std::nullopt}}, 10);
+  ASSERT_EQ(out.size(), 2u);
+  EXPECT_EQ(out[0].text, "ab");
+  EXPECT_EQ(out[1].text, "cdef");
+}
+
+TEST(Refresh, CompressedSharesOneBoxWithSeparators) {
+  // 10 peers need 2 + 1 + 10*6 = 63 normal lines > fallback 24 rows,
+  // so refresh must pick the compressed layout.
+  cpptui::App app;
+  CliOptions opts;
+  RateTracker tracker;
+  tracker.ingest(synthetic_frame(1000.0, 100, 10));
+  tracker.ingest(synthetic_frame(1001.0, 200, 10));
+  Ui ui(app, opts, tracker);
+  ui.refresh(synthetic_frame(1001.0, 200, 10));
+  const auto root =
+      std::dynamic_pointer_cast<cpptui::Container>(ui.root());
+  ASSERT_NE(root, nullptr);
+  // header, flex body (interface line + shared box), footer.
+  const auto& kids = root->get_children();
+  ASSERT_EQ(kids.size(), 3u);
+  const auto compressed_body =
+      std::dynamic_pointer_cast<cpptui::Container>(kids[1]);
+  ASSERT_NE(compressed_body, nullptr);
+  const auto& content = compressed_body->get_children();
+  ASSERT_EQ(content.size(), 2u);
+  const auto box = std::dynamic_pointer_cast<CompressedBox>(content[1]);
+  ASSERT_NE(box, nullptr);
+  // 10 peers x (info + plots + stats) + 9 blank separator rows, which the
+  // box overpaints with ├─┤ blended into the outer border.
+  const auto inner =
+      std::dynamic_pointer_cast<cpptui::Container>(box->get_children()[0]);
+  ASSERT_NE(inner, nullptr);
+  ASSERT_EQ(inner->get_children().size(), 39u);
+  // Merged info line carries the allowed IPs inline.
+  const auto info =
+      std::dynamic_pointer_cast<cpptui::Label>(inner->get_children()[0]);
+  ASSERT_NE(info, nullptr);
+  EXPECT_NE(info->get_text().find("(10.255.0.2/32)"), std::string::npos);
+}
+
+TEST(Refresh, OverflowKeepsFooterAndInfoRows) {
+  // Mirrors the 66x34 field report: 10 peers need more rows than fit, so
+  // the flex body clips internally. Footer and every peer info line must
+  // keep a full row (separators overpaint only their reserved rows).
+  cpptui::App app;
+  CliOptions opts;
+  RateTracker tracker;
+  tracker.ingest(synthetic_frame(1000.0, 100, 10));
+  tracker.ingest(synthetic_frame(1001.0, 200, 10));
+  Ui ui(app, opts, tracker);
+  ui.refresh(synthetic_frame(1001.0, 200, 10));
+  const auto root =
+      std::dynamic_pointer_cast<cpptui::Container>(ui.root());
+  ASSERT_NE(root, nullptr);
+  root->x = 0;
+  root->y = 0;
+  root->width = 66;
+  root->height = 34;
+  root->layout();
+  const auto& kids = root->get_children();
+  ASSERT_EQ(kids.size(), 3u);
+  const auto footer = kids[2];
+  EXPECT_EQ(footer->height, 1);
+  EXPECT_EQ(footer->y, 33);
+  const auto body =
+      std::dynamic_pointer_cast<cpptui::Container>(kids[1]);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->get_children().size(), 2u);
+  const auto box =
+      std::dynamic_pointer_cast<CompressedBox>(body->get_children()[1]);
+  ASSERT_NE(box, nullptr);
+  const auto inner =
+      std::dynamic_pointer_cast<cpptui::Container>(box->get_children()[0]);
+  ASSERT_NE(inner, nullptr);
+  // 29 content rows fit; the 10 tail rows clip to 0 in order (graceful
+  // bottom cut). The regression was rows swallowed mid-list.
+  ASSERT_EQ(inner->get_children().size(), 39u);
+  for (std::size_t i = 0; i < inner->get_children().size(); ++i)
+    EXPECT_EQ(inner->get_children()[i]->height, i < 29 ? 1 : 0)
+        << "child " << i;
 }
