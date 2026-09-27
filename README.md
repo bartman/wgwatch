@@ -109,5 +109,5 @@ shows an `ERR` banner instead of freezing silently.
   theme, and key mode. Stale collector shows an `ERR` banner.
 - Each peer gets a box: endpoint, handshake age (green <3min, yellow
   <10min, red older), key, allowed IPs, side-by-side rx/tx plots, and
-  totals with live rates. Plot height (1–4 lines) scales to fit the
-  terminal.
+  totals with window avg/peak rates. Plot height (1–4 lines) scales to
+  fit the terminal.

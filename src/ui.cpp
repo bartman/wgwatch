@@ -202,8 +202,14 @@ void Ui::refresh(const WgFrame& frame) {
           hdc));
     }
     const auto it = states.find(p.iface + "|" + p.pubkey);
-    const double rxr = it != states.end() ? it->second.rx_rate : 0.0;
-    const double txr = it != states.end() ? it->second.tx_rate : 0.0;
+    const WindowStats rxw = it != states.end()
+                                ? window_stats(it->second.rx_hist,
+                                               it->second.n)
+                                : WindowStats{};
+    const WindowStats txw = it != states.end()
+                                ? window_stats(it->second.tx_hist,
+                                               it->second.n)
+                                : WindowStats{};
     cpptui::Color hc = erc;
     std::string ago = "never";
     if (p.handshake != 0) {
@@ -251,7 +257,8 @@ void Ui::refresh(const WgFrame& frame) {
     cpptui::StyledText rx_stats;
     rx_stats.add(" rx ");
     rx_stats.colored(wfmt::fmt_bytes(p.rx), rxc);
-    rx_stats.add(fmt::format(" ({})", wfmt::fmt_rate(rxr)));
+    rx_stats.add(fmt::format(", avg {}, peak {}", wfmt::fmt_rate(rxw.avg),
+                             wfmt::fmt_rate(rxw.peak)));
     stats_row->add(std::make_shared<cpptui::Label>(rx_stats, fg));
     auto stats_gap = std::make_shared<cpptui::Label>(cpptui::StyledText("   "));
     stats_gap->fixed_width = 3;
@@ -259,7 +266,8 @@ void Ui::refresh(const WgFrame& frame) {
     cpptui::StyledText tx_stats;
     tx_stats.add(" tx ");
     tx_stats.colored(wfmt::fmt_bytes(p.tx), txc);
-    tx_stats.add(fmt::format(" ({})", wfmt::fmt_rate(txr)));
+    tx_stats.add(fmt::format(", avg {}, peak {}", wfmt::fmt_rate(txw.avg),
+                             wfmt::fmt_rate(txw.peak)));
     stats_row->add(std::make_shared<cpptui::Label>(tx_stats, fg));
     inner->add(stats_row);
     box->add(inner);

@@ -32,6 +32,26 @@ struct PeerState {
   double last_t = -1.0;
 };
 
+// Mean and peak over the retained rate window (what the plots show).
+// Pure: unit-tested.
+struct WindowStats {
+  double avg = 0.0;
+  double peak = 0.0;
+};
+
+inline WindowStats window_stats(const std::array<double, 120>& hist,
+                                std::size_t n) {
+  WindowStats s;
+  if (n == 0) return s;
+  double sum = 0.0;
+  for (std::size_t i = 0; i < n; ++i) {
+    sum += hist[i];
+    s.peak = std::max(s.peak, hist[i]);
+  }
+  s.avg = sum / static_cast<double>(n);
+  return s;
+}
+
 class RateTracker {
  public:
   void ingest(const WgFrame& f);

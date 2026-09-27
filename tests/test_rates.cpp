@@ -81,3 +81,27 @@ TEST(Rates, HistorySpanGrowsThenCaps) {
   EXPECT_EQ(tr.peers().at("wg0|k").n, 120u);
   EXPECT_DOUBLE_EQ(tr.history_span(), 119.0);
 }
+
+TEST(WindowStats, EmptyYieldsZeros) {
+  std::array<double, 120> h{};
+  const WindowStats s = window_stats(h, 0);
+  EXPECT_DOUBLE_EQ(s.avg, 0.0);
+  EXPECT_DOUBLE_EQ(s.peak, 0.0);
+}
+
+TEST(WindowStats, ConstantYieldsItself) {
+  std::array<double, 120> h{};
+  h[0] = 4.0;
+  h[1] = 4.0;
+  const WindowStats s = window_stats(h, 2);
+  EXPECT_DOUBLE_EQ(s.avg, 4.0);
+  EXPECT_DOUBLE_EQ(s.peak, 4.0);
+}
+
+TEST(WindowStats, RampMeanAndPeak) {
+  std::array<double, 120> h{};
+  for (std::size_t i = 0; i < 4; ++i) h[i] = static_cast<double>(i + 1);
+  const WindowStats s = window_stats(h, 4);
+  EXPECT_DOUBLE_EQ(s.avg, 2.5);
+  EXPECT_DOUBLE_EQ(s.peak, 4.0);
+}
