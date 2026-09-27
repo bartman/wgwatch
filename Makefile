@@ -30,7 +30,7 @@ else
 $(error TYPE must be release or debug (got '$(TYPE)'))
 endif
 
-.PHONY: all clean distclean test install deb rpm help config
+.PHONY: all clean distclean test coverage install deb rpm help config
 
 all: config
 	cmake --build $(BUILD)
@@ -54,6 +54,26 @@ distclean:
 test: all
 	ctest --test-dir $(BUILD) --output-on-failure
 
+# Coverage via clang + llvm-cov, no converter needed (codecov takes lcov).
+# Uses its own build dir so profiling flags never leak into build/.
+# LLVM_COV override for versioned distro binaries (e.g. LLVM_COV=llvm-cov-19).
+LLVM_COV ?= llvm-cov
+LLVM_PROFDATA ?= llvm-profdata
+
+coverage:
+	cmake -S . -B build-cov -G Ninja \
+	  -DCMAKE_BUILD_TYPE=Debug \
+	  -DCMAKE_CXX_COMPILER=$(CXX) \
+	  -DCMAKE_CXX_FLAGS="-fprofile-instr-generate -fcoverage-mapping -O0 -g -fno-inline" \
+	  -DCMAKE_EXE_LINKER_FLAGS="-fprofile-instr-generate"
+	cmake --build build-cov
+	rm -f build-cov/cov-*.profraw build-cov/coverage.profdata build-cov/coverage.lcov
+	LLVM_PROFILE_FILE=$(CURDIR)/build-cov/cov-%p.profraw ctest --test-dir build-cov --output-on-failure
+	$(LLVM_PROFDATA) merge -sparse build-cov/cov-*.profraw -o build-cov/coverage.profdata
+	$(LLVM_COV) export ./build-cov/tests/wgwatch_tests -instr-profile=build-cov/coverage.profdata \
+	  --format=lcov --ignore-filename-regex='(tests/|/_deps/|/usr/include|/usr/lib|_attic/)' \
+	  > build-cov/coverage.lcov
+
 install: all
 	cmake --install $(BUILD) --prefix $(HOME)/.local
 
@@ -69,6 +89,7 @@ help:
 	@echo "  clean          clean the binaries"
 	@echo "  distclean      remove BUILD directory"
 	@echo "  test           run unit tests"
+	@echo "  coverage       run tests under llvm-cov -> build-cov/coverage.lcov"
 	@echo "  install        install binary in ~/.local/bin"
 	@echo "  deb            build .deb package (Debian)"
 	@echo "  rpm            build .rpm package (Fedora)"

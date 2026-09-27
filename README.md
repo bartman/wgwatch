@@ -1,6 +1,6 @@
 # wgwatch
 
-[![CI](https://github.com/bartman/wgwatch/actions/workflows/ci.yml/badge.svg)](https://github.com/bartman/wgwatch/actions)
+[![CI](https://github.com/bartman/wgwatch/actions/workflows/ci.yml/badge.svg)](https://github.com/bartman/wgwatch/actions) [![codecov](https://codecov.io/gh/bartman/wgwatch/branch/master/graph/badge.svg)](https://codecov.io/gh/bartman/wgwatch)
 
 Top-like WireGuard monitor (C++20, CMake+Ninja, clang first).
 

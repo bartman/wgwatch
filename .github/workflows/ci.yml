@@ -37,6 +37,22 @@ jobs:
           name: wgwatch-rpm
           path: build/*.rpm
 
+  coverage:
+    runs-on: ubuntu-latest
+    container: debian:stable-slim
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./dependencies.sh --coverage
+      - run: make coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wgwatch-coverage
+          path: build-cov/coverage.lcov
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   nix-shell:
     runs-on: ubuntu-latest
     steps:

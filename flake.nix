@@ -17,6 +17,7 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             llvm.clang
+            llvm.llvm  # llvm-cov/llvm-profdata, version-matched to clang
             gcc
             cmake
             ninja
