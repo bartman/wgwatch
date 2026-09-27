@@ -98,8 +98,14 @@ shows an `ERR` banner instead of freezing silently.
 
 - `q`: quit (plus Ctrl+C).
 - `k`: toggle key visibility.
-- `s`: cycle peer sort order (shown in the status bar).
-- Header shows origin, peer count, window, and key mode; stale collector
-  shows an `ERR` banner.
-- Peer rows: endpoint, allowed IPs, totals, live rx/tx rates, handshake age
-  (green <3min, yellow <10min, red older), and rx/tx braille sparklines.
+- `s`: cycle peer sort order (shown in the footer).
+- `p`: toggle plot style (`line` braille vs `bar` blocks).
+- `t`: cycle theme (catppuccin-mocha, dracula, nord, gruvbox-dark,
+  tokyo-night, solarized-dark, github-dark, shades-of-purple, rose-pine,
+  kanagawa-wave, everforest-dark, one-dark).
+- Header shows origin, peer count, and window; footer shows sort, plot,
+  theme, and key mode. Stale collector shows an `ERR` banner.
+- Each peer gets a box: endpoint, handshake age (green <3min, yellow
+  <10min, red older), key, allowed IPs, side-by-side rx/tx plots, and
+  totals with live rates. Plot height (1–4 lines) scales to fit the
+  terminal.

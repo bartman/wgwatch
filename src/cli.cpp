@@ -78,6 +78,20 @@ SortKey next_sort(SortKey s) {
   return SortKey::Mru;
 }
 
+std::string plot_name(PlotMode m) {
+  switch (m) {
+    case PlotMode::Line:
+      return "line";
+    case PlotMode::Bar:
+      return "bar";
+  }
+  return "line";  // unreachable
+}
+
+PlotMode next_plot(PlotMode m) {
+  return m == PlotMode::Line ? PlotMode::Bar : PlotMode::Line;
+}
+
 CliOptions parse_cli(int argc, char* argv[]) {
   CliOptions o;
   const std::regex update_re(R"(^[0-9]+(\.[0-9]+)?$)");

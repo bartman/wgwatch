@@ -7,12 +7,16 @@ add_executable(wgwatch_tests
   test_cli.cpp
   test_collector.cpp
   test_sort.cpp
+  test_theme.cpp
+  test_ui.cpp
   ../src/parser.cpp
   ../src/rates.cpp
   ../src/cli.cpp
   ../src/collector.cpp
+  ../src/ui.cpp
 )
 target_link_libraries(wgwatch_tests PRIVATE
+  cpptui::cpptui
   GTest::gtest_main
   fmt::fmt
   spdlog::spdlog

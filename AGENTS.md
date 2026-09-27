@@ -20,12 +20,14 @@
 - `src/format.hpp`: byte/rate/age formatting.
 - `src/sampler.*`: libev reader thread (only file including `<ev.h>`);
   emits stale frames on EOF or stall (>2.5× update, min 3s).
-- `src/ui.*`, `src/main.cpp`: cpptui layout + wiring; spdlog setup lives in
-  main (`-v` → debug, `-vv` → trace, `--log` → file).
+- `src/ui.*`, `src/main.cpp`: boxed peer layout, PlotWidget (line/bar),
+  dynamic plot height (`plot_height_for`), `t`/`p` keys; spdlog setup
+  lives in main (`-v` → debug, `-vv` → trace, `--log` → file).
+[AGENTS.md#A685]
 - `cmake/*.cmake`: FetchContent packages (SYSTEM + FIND_PACKAGE_ARGS).
-- `vendor/cpptui.hpp`: shim over `_attic/cpptui.hpp` (do not duplicate).
+- `src/theme.hpp`: 12 built-in themes (terminalcolors.com palettes);
+  `theme_at()` wraps for the `t` key.
 - `package.nix` / `default.nix`: nix derivation + non-flake entry
-  (`nix-build`); flake `packages.default` calls it.
 - `RELEASE.md`: release checklist (bump → tag → push).
 
 ## Rules
