@@ -29,6 +29,8 @@
   `theme_at()` wraps for the `t` key.
 - `src/config.hpp`: `~/.config/wgwatch/config` load/save (atomic
   rewrite); toggles persist, CLI flags override the file.
+- `tests/fake-wg.py`: fake `wg show all dump` for demos
+  (`--command`, env-tuned loads, `.fake-wg-state` counters).
 - `package.nix` / `default.nix`: nix derivation + non-flake entry
 - `RELEASE.md`: release checklist (bump → tag → push).
 

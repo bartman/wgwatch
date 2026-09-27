@@ -123,3 +123,11 @@ Any toggle key (`k`, `s`, `i`, `p`, `t`) rewrites it atomically
 (staging file + rename). The file is re-read on startup; command-line
 flags override it. `remote` and `interface` are never written (always
 `local` / `all` by default).
+
+## Demo without hardware
+
+`tests/fake-wg.py` pretends to be `wg` (see its header for the full
+design). Try:
+```sh
+FAKE_WG_LOAD=sin/cos,bursty,random wgwatch --command tests/fake-wg.py
+```

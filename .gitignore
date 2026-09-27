@@ -8,3 +8,4 @@
 *.deb
 *.rpm
 state-*
+.fake-wg-state
