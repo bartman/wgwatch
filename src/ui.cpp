@@ -1,5 +1,6 @@
 #include "ui.hpp"
 
+#include <algorithm>
 #include <ctime>
 #include <map>
 #include <utility>
@@ -103,6 +104,10 @@ Ui::Ui(cpptui::App& app, CliOptions& opts, RateTracker& tracker)
     opts_->sort = next_sort(opts_->sort);
     refresh(last_);
   });
+  app_->register_key('i', [this] {
+    opts_->hide_inactive = !opts_->hide_inactive;
+    refresh(last_);
+  });
   app_->register_key('p', [this] {
     opts_->plot_mode = next_plot(opts_->plot_mode);
     refresh(last_);
@@ -138,8 +143,10 @@ void Ui::refresh(const WgFrame& frame) {
   root_->add(header_);
   const auto add_footer = [&] {
     footer_->set_text(cpptui::StyledText(fmt::format(
-        "q quit, s sort ({}), p plot ({}), t theme ({}), k keys ({})",
+        "q quit, s sort ({}), p plot ({}), t theme ({}), i inactive ({}), k "
+        "keys ({})",
         sort_name(opts_->sort), plot_name(opts_->plot_mode), th.name,
+        opts_->hide_inactive ? "hidden" : "shown",
         opts_->show_keys ? "shown" : "hidden")));
     footer_->fg_color = dim;
     root_->add(footer_);
@@ -153,8 +160,16 @@ void Ui::refresh(const WgFrame& frame) {
     return;
   }
   const auto states = tracker_->peers();
-  const std::vector<const WgPeer*> order =
+  std::vector<const WgPeer*> order =
       sort_peers(frame, states, opts_->sort);
+  // Inactive = never handshook. Filter before layout so hidden peers take
+  // no space and emit no interface header.
+  if (opts_->hide_inactive)
+    order.erase(std::remove_if(order.begin(), order.end(),
+                               [](const WgPeer* p) {
+                                 return p->handshake == 0;
+                               }),
+                order.end());
   std::map<std::string, const WgIface*> ifaces;
   for (const WgIface& fi : frame.ifaces) ifaces[fi.name] = &fi;
   // Header lines actually emitted: one per interface transition in display

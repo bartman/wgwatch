@@ -27,6 +27,7 @@ enum class PlotMode {
 // nothing unscrubbed reaches a shell command.
 struct CliOptions {
   bool show_keys = false;
+  bool hide_inactive = false;  // --hide-inactive, 'i' toggles
   double update_sec = 1.0;
   std::string interface = "all";
   std::optional<std::string> remote;

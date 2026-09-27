@@ -158,3 +158,24 @@ TEST(Refresh, StaleFrameShowsErrAndFooter) {
 }
 
 }  // namespace
+
+TEST(Refresh, HideInactiveFiltersNeverHandshook) {
+  auto frame = synthetic_frame(1001.0, 200);
+  frame.peers[1].handshake = 0;
+  const auto count_boxes = [&](bool hide) {
+    cpptui::App app;
+    CliOptions opts;
+    opts.hide_inactive = hide;
+    RateTracker tracker;
+    tracker.ingest(synthetic_frame(1000.0, 100));
+    tracker.ingest(synthetic_frame(1001.0, 200));
+    Ui ui(app, opts, tracker);
+    ui.refresh(frame);
+    const auto root =
+        std::dynamic_pointer_cast<cpptui::Container>(ui.root());
+    return root->get_children().size();
+  };
+  // header, iface, two boxes, footer vs one box hidden.
+  EXPECT_EQ(count_boxes(false), 5u);
+  EXPECT_EQ(count_boxes(true), 4u);
+}

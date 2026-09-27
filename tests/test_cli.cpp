@@ -136,3 +136,8 @@ TEST(Cli, UsageMentionsLogging) {
   EXPECT_NE(usage().find("--verbose"), std::string::npos);
   EXPECT_NE(usage().find("--log"), std::string::npos);
 }
+
+TEST(Cli, HideInactive) {
+  EXPECT_FALSE(run({"wgwatch"}).hide_inactive);
+  EXPECT_TRUE(run({"wgwatch", "--hide-inactive"}).hide_inactive);
+}

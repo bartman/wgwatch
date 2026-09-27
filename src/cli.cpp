@@ -19,7 +19,8 @@ std::string usage() {
          "  -v --verbose                increase log verbosity (repeat for "
          "trace)\n"
          "  --log <file>                write logs to file (default stderr)\n"
-         "  --show-keys                 show keys (default hide them)\n";
+         "  --show-keys                 show keys (default hide them)\n"
+         "  --hide-inactive             hide peers that never handshook\n";
 }
 
 std::string sort_help() {
@@ -109,6 +110,8 @@ CliOptions parse_cli(int argc, char* argv[]) {
       throw HelpRequested{};
     } else if (a == "--show-keys") {
       o.show_keys = true;
+    } else if (a == "--hide-inactive") {
+      o.hide_inactive = true;
     } else if (a == "--verbose") {
       ++o.verbose;
     } else if (std::regex_match(a, v_bundle_re)) {

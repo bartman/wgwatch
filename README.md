@@ -88,6 +88,7 @@ wgwatch [-u SEC] [-i IFACE] [-r [user@]host] [-s TYPE] [-v] [--log FILE] [--show
 - `-v/--verbose`: debug logging; repeat (`-vv`) for trace. Default info.
 - `--log FILE`: write logs to FILE (truncated) instead of stderr.
 - `--show-keys`: reveal WireGuard keys (hidden by default).
+- `--hide-inactive`: hide peers that never handshook (shown by default).
 
 Needs permission to run `wg show`: root, or `sudo`/`doas` on PATH
 (resolved inside the loop shell, locally and remotely). If the collector
@@ -99,6 +100,7 @@ shows an `ERR` banner instead of freezing silently.
 - `q`: quit (plus Ctrl+C).
 - `k`: toggle key visibility.
 - `s`: cycle peer sort order (shown in the footer).
+- `i`: toggle inactive peers (never handshook) shown/hidden.
 - `p`: toggle plot style (`line` braille vs `bar` blocks).
 - `t`: cycle theme (catppuccin-mocha, dracula, nord, gruvbox-dark,
   tokyo-night, solarized-dark, github-dark, shades-of-purple, rose-pine,
