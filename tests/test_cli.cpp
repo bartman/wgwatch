@@ -147,3 +147,13 @@ TEST(Cli, VersionThrowsAndFormats) {
   EXPECT_EQ(version_string(), "wgwatch " WGWATCH_VERSION);
   EXPECT_NE(version_string().find("wgwatch "), std::string::npos);
 }
+
+TEST(Cli, CommandPath) {
+  EXPECT_EQ(run({"wgwatch"}).command, "wg");
+  EXPECT_EQ(run({"wgwatch", "--command", "/my/version/of/wg"}).command,
+            "/my/version/of/wg");
+  EXPECT_THROW(run({"wgwatch", "--command", "wg; rm -rf /"}),
+               std::invalid_argument);
+  EXPECT_THROW(run({"wgwatch", "--command", "my wg"}), std::invalid_argument);
+  EXPECT_THROW(run({"wgwatch", "--command"}), std::invalid_argument);
+}

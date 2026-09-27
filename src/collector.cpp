@@ -31,13 +31,13 @@ std::string build_loop_command(const CliOptions& o) {
   const std::string detect = priv::sudo_detect_snippet();
   if (priv::is_root())
     return fmt::format(
-        "{}while true; do date +%s.%N || exit; wg show all dump; sleep {} || "
+        "{}while true; do date +%s.%N || exit; {} show all dump; sleep {} || "
         "exit; done",
-        kTrap, sec);
+        kTrap, o.command, sec);
   return fmt::format(
-      "{}PRIV={}; while true; do date +%s.%N || exit; $PRIV wg show all dump; "
+      "{}PRIV={}; while true; do date +%s.%N || exit; $PRIV {} show all dump; "
       "sleep {} || exit; done",
-      kTrap, detect, sec);
+      kTrap, detect, o.command, sec);
 }
 
 std::string build_remote_command(const CliOptions& o) {
@@ -46,9 +46,9 @@ std::string build_remote_command(const CliOptions& o) {
   // Passed to ssh as a single argv (no local shell quoting involved); the
   // remote sshd runs it via the remote shell.
   return fmt::format(
-      "{}SUDO={}; while true; do date +%s.%N || exit; $SUDO wg show all dump; "
+      "{}SUDO={}; while true; do date +%s.%N || exit; $SUDO {} show all dump; "
       "sleep {} || exit; done",
-      kTrap, detect, sec);
+      kTrap, detect, o.command, sec);
 }
 
 std::vector<std::string> build_ssh_argv(const CliOptions& o,

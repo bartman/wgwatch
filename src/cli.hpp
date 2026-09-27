@@ -31,6 +31,7 @@ struct CliOptions {
   double update_sec = 1.0;
   std::string interface = "all";
   std::optional<std::string> remote;
+  std::string command = "wg";  // --command: wg binary path, never persisted
   SortKey sort = SortKey::Mru;
   PlotMode plot_mode = PlotMode::Line;  // 'p' toggles
   std::size_t theme = 0;                // 't' cycles wtheme::kThemes

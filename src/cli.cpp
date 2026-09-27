@@ -12,6 +12,7 @@ std::string usage() {
          "  --version                   print version and exit\n"
          "  -r --remote [user@]host     access stats remotely via ssh (default "
          "local)\n"
+         "  --command <path>            wg binary to run (default wg)\n"
          "  -u --update <sec>           frequence of display update (default "
          "1)\n"
          "  -i --interface <iface>      which wg* interface to watch (default "
@@ -148,6 +149,7 @@ double update_from_string(const std::string& v) {
 CliOptions parse_cli(int argc, char* argv[], CliOptions base) {
   CliOptions o = base;
   const std::regex iface_re(R"(^[A-Za-z0-9_=+.-]{1,15}$)");
+  const std::regex cmd_re(R"(^[A-Za-z0-9_+=/.,:@-]{1,128}$)");
   const std::regex remote_re(R"(^([A-Za-z0-9._-]+@)?[A-Za-z0-9._-]+$)");
   const std::regex v_bundle_re(R"(^-v+$)");
   auto need_value = [&](int& i, const char* flag) -> std::string {
@@ -183,6 +185,11 @@ CliOptions parse_cli(int argc, char* argv[], CliOptions base) {
       if (!std::regex_match(v, remote_re))
         throw std::invalid_argument("invalid --remote '" + v + "'");
       o.remote = v;
+    } else if (a == "--command") {
+      const std::string v = need_value(i, "--command");
+      if (!std::regex_match(v, cmd_re))
+        throw std::invalid_argument("invalid --command '" + v + "'");
+      o.command = v;
     } else if (a == "-s" || a == "--sort") {
       const std::string v = need_value(i, "--sort");
       if (v == "help") throw SortHelpRequested{};

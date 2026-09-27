@@ -54,3 +54,12 @@ TEST(CollectorCmd, SshArgvCarriesFlagsAndCommand) {
   EXPECT_EQ(argv[8], "user@example.com");
   EXPECT_EQ(argv.back(), body);
 }
+
+TEST(CollectorCmd, CustomCommandReplacesWg) {
+  CliOptions o;
+  o.command = "/my/version/of/wg";
+  EXPECT_NE(build_loop_command(o).find("/my/version/of/wg show all dump"),
+            std::string::npos);
+  EXPECT_NE(build_remote_command(o).find("/my/version/of/wg show all dump"),
+            std::string::npos);
+}

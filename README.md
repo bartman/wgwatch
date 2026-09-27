@@ -84,6 +84,7 @@ wgwatch [-u SEC] [-i IFACE] [-r [user@]host] [-s TYPE] [-v] [--log FILE] [--show
 - `-u/--update SEC`: refresh interval, 0.1–3600s (default 1.0).
 - `-i/--interface IFACE`: show one interface, or `all` (default).
 - `-r/--remote [user@]host`: collect over ssh (key auth, `BatchMode=yes`).
+- `--command PATH`: wg binary to run, locally and remotely (default `wg`).
 - `-s/--sort TYPE`: peer order — `native`, `endpoint`, `allowed`,
   `mru` (default), `lru`, `rx-bytes`, `tx-bytes`, `bytes`, `rx-rate`,
   `tx-rate`, `rate` (`help` lists them).
