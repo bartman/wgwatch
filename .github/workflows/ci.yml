@@ -9,14 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     container: debian:stable-slim
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: ./dependencies.sh
       - run: make
       - run: make test
       - run: make deb
       - run: dpkg -i build/*.deb
       - run: wgwatch --help
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: wgwatch-deb
           path: build/*.deb
@@ -25,14 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: ./dependencies.sh
       - run: make
       - run: make test
       - run: make rpm
       - run: dnf install -y ./build/*.rpm
       - run: wgwatch --help
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: wgwatch-rpm
           path: build/*.rpm
@@ -41,10 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     container: debian:stable-slim
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: ./dependencies.sh --coverage
       - run: make coverage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: wgwatch-coverage
           path: build-cov/coverage.lcov
@@ -56,17 +56,15 @@ jobs:
   nix-shell:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix develop --command bash -c 'make && make test'
 
   nix-package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build .#default
       - run: ./result/bin/wgwatch --help
 
@@ -77,10 +75,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: wgwatch-deb
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: wgwatch-rpm
       - uses: softprops/action-gh-release@v2
