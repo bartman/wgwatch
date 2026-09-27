@@ -34,6 +34,7 @@ TEST(Parser, FixtureFields) {
   const WgFrame f = parse_frame(dump, "all");
   ASSERT_EQ(f.ifaces.size(), 1u);
   EXPECT_EQ(f.ifaces[0].name, "wg0");
+  EXPECT_FALSE(f.ifaces[0].pubkey.empty());
   EXPECT_EQ(f.ifaces[0].port, 51820);
   ASSERT_GE(f.peers.size(), 1u);
   const WgPeer& p = f.peers[0];

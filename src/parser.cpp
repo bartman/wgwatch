@@ -71,6 +71,7 @@ WgFrame parse_frame(std::string_view block, std::string_view filter) {
       WgIface ni;
       ni.name = std::string(cols[0]);
       ni.privkey = std::string(cols[1]);
+      ni.pubkey = std::string(cols[2]);
       if (cols[3] == "off") {
         ni.port = 0;
       } else {
