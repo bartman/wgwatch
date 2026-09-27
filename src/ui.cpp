@@ -12,6 +12,7 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+#include "config.hpp"
 #include "format.hpp"
 
 namespace {
@@ -99,22 +100,27 @@ Ui::Ui(cpptui::App& app, CliOptions& opts, RateTracker& tracker)
   app_->register_key('k', [this] {
     opts_->show_keys = !opts_->show_keys;
     refresh(last_);
+    wconfig::save_config(*opts_);
   });
   app_->register_key('s', [this] {
     opts_->sort = next_sort(opts_->sort);
     refresh(last_);
+    wconfig::save_config(*opts_);
   });
   app_->register_key('i', [this] {
     opts_->hide_inactive = !opts_->hide_inactive;
     refresh(last_);
+    wconfig::save_config(*opts_);
   });
   app_->register_key('p', [this] {
     opts_->plot_mode = next_plot(opts_->plot_mode);
     refresh(last_);
+    wconfig::save_config(*opts_);
   });
   app_->register_key('t', [this] {
     opts_->theme = (opts_->theme + 1) % wtheme::num_themes();
     refresh(last_);
+    wconfig::save_config(*opts_);
   });
 }
 

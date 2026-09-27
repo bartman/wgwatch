@@ -9,6 +9,7 @@ add_executable(wgwatch_tests
   test_sort.cpp
   test_theme.cpp
   test_ui.cpp
+  test_config.cpp
   ../src/parser.cpp
   ../src/rates.cpp
   ../src/cli.cpp

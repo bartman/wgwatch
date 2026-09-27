@@ -111,3 +111,11 @@ shows an `ERR` banner instead of freezing silently.
   <10min, red older), key, allowed IPs, side-by-side rx/tx plots, and
   totals with window avg/peak rates. Plot height (1–4 lines) scales to
   fit the terminal.
+
+## Config
+
+UI options persist in `~/.config/wgwatch/config` (`key = value` lines).
+Any toggle key (`k`, `s`, `i`, `p`, `t`) rewrites it atomically
+(staging file + rename). The file is re-read on startup; command-line
+flags override it. `remote` and `interface` are never written (always
+`local` / `all` by default).

@@ -109,13 +109,13 @@ void Collector::start(const CliOptions& o) {
   group_ok_ = (::setpgid(pid, pid) == 0 || errno == EACCES);
   fd_ = fds[0];
   pid_ = static_cast<int>(pid);
-  spdlog::info("collector: started pid={} fd={} group_kill={}", pid_, fd_,
+  spdlog::debug("collector: started pid={} fd={} group_kill={}", pid_, fd_,
                group_ok_);
 }
 
 void Collector::stop() {
   if (pid_ != -1)
-    spdlog::info("collector: stopping pid={}", pid_);
+    spdlog::debug("collector: stopping pid={}", pid_);
   if (pid_ != -1) {
     if (group_ok_)
       ::killpg(pid_, SIGTERM);

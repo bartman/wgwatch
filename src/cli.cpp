@@ -3,6 +3,7 @@
 #include <regex>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
+#include "theme.hpp"
 
 std::string usage() {
   return "wgwatch — top-like WireGuard monitor\n"
@@ -20,7 +21,11 @@ std::string usage() {
          "trace)\n"
          "  --log <file>                write logs to file (default stderr)\n"
          "  --show-keys                 show keys (default hide them)\n"
-         "  --hide-inactive             hide peers that never handshook\n";
+         "  --hide-inactive             hide peers that never handshook\n"
+         "  --plot <type>               plot style: line, bar\n"
+         "  --theme <name>              color theme (default catppuccin-mocha)\n"
+         "  --inactive <mode>           hide|show peers that never handshook\n"
+         "  --public-keys <mode>        show|hide WireGuard keys\n";
 }
 
 std::string sort_help() {
@@ -93,9 +98,45 @@ PlotMode next_plot(PlotMode m) {
   return m == PlotMode::Line ? PlotMode::Bar : PlotMode::Line;
 }
 
-CliOptions parse_cli(int argc, char* argv[]) {
-  CliOptions o;
-  const std::regex update_re(R"(^[0-9]+(\.[0-9]+)?$)");
+SortKey sort_from_name(const std::string& v) {
+  if (v == "native") return SortKey::Native;
+  if (v == "endpoint") return SortKey::Endpoint;
+  if (v == "allowed") return SortKey::Allowed;
+  if (v == "mru") return SortKey::Mru;
+  if (v == "lru") return SortKey::Lru;
+  if (v == "rx-bytes") return SortKey::RxBytes;
+  if (v == "tx-bytes") return SortKey::TxBytes;
+  if (v == "bytes") return SortKey::Bytes;
+  if (v == "rx-rate") return SortKey::RxRate;
+  if (v == "tx-rate") return SortKey::TxRate;
+  if (v == "rate") return SortKey::Rate;
+  throw std::invalid_argument(
+      "invalid --sort '" + v +
+      "': expected one of native,endpoint,allowed,mru,lru,rx-bytes,"
+      "tx-bytes,bytes,rx-rate,tx-rate,rate (or 'help')");
+}
+
+PlotMode plot_from_name(const std::string& v) {
+  if (v == "line") return PlotMode::Line;
+  if (v == "bar") return PlotMode::Bar;
+  throw std::invalid_argument("invalid --plot '" + v +
+                              "': expected one of line,bar");
+}
+
+double update_from_string(const std::string& v) {
+  static const std::regex update_re(R"(^[0-9]+(\.[0-9]+)?$)");
+  if (!std::regex_match(v, update_re))
+    throw std::invalid_argument("invalid --update '" + v +
+                                "': expected number in [0.1,3600]");
+  const double d = std::stod(v);
+  if (d < 0.1 || d > 3600.0)
+    throw std::invalid_argument("invalid --update '" + v +
+                                "': expected range [0.1,3600]");
+  return d;
+}
+
+CliOptions parse_cli(int argc, char* argv[], CliOptions base) {
+  CliOptions o = base;
   const std::regex iface_re(R"(^[A-Za-z0-9_=+.-]{1,15}$)");
   const std::regex remote_re(R"(^([A-Za-z0-9._-]+@)?[A-Za-z0-9._-]+$)");
   const std::regex v_bundle_re(R"(^-v+$)");
@@ -119,15 +160,7 @@ CliOptions parse_cli(int argc, char* argv[]) {
     } else if (a == "--log") {
       o.log_file = need_value(i, "--log");
     } else if (a == "-u" || a == "--update") {
-      const std::string v = need_value(i, "--update");
-      if (!std::regex_match(v, update_re))
-        throw std::invalid_argument("invalid --update '" + v +
-                                    "': expected number in [0.1,3600]");
-      const double d = std::stod(v);
-      if (d < 0.1 || d > 3600.0)
-        throw std::invalid_argument("invalid --update '" + v +
-                                    "': expected range [0.1,3600]");
-      o.update_sec = d;
+      o.update_sec = update_from_string(need_value(i, "--update"));
     } else if (a == "-i" || a == "--interface") {
       const std::string v = need_value(i, "--interface");
       if (!std::regex_match(v, iface_re))
@@ -141,33 +174,34 @@ CliOptions parse_cli(int argc, char* argv[]) {
     } else if (a == "-s" || a == "--sort") {
       const std::string v = need_value(i, "--sort");
       if (v == "help") throw SortHelpRequested{};
-      if (v == "native")
-        o.sort = SortKey::Native;
-      else if (v == "endpoint")
-        o.sort = SortKey::Endpoint;
-      else if (v == "allowed")
-        o.sort = SortKey::Allowed;
-      else if (v == "mru")
-        o.sort = SortKey::Mru;
-      else if (v == "lru")
-        o.sort = SortKey::Lru;
-      else if (v == "rx-bytes")
-        o.sort = SortKey::RxBytes;
-      else if (v == "tx-bytes")
-        o.sort = SortKey::TxBytes;
-      else if (v == "bytes")
-        o.sort = SortKey::Bytes;
-      else if (v == "rx-rate")
-        o.sort = SortKey::RxRate;
-      else if (v == "tx-rate")
-        o.sort = SortKey::TxRate;
-      else if (v == "rate")
-        o.sort = SortKey::Rate;
+      o.sort = sort_from_name(v);
+    } else if (a == "--plot") {
+      o.plot_mode = plot_from_name(need_value(i, "--plot"));
+    } else if (a == "--theme") {
+      const std::string v = need_value(i, "--theme");
+      std::size_t idx = 0;
+      if (!wtheme::theme_index(v, idx))
+        throw std::invalid_argument("invalid --theme '" + v +
+                                    "': expected a theme name");
+      o.theme = idx;
+    } else if (a == "--inactive") {
+      const std::string v = need_value(i, "--inactive");
+      if (v == "hide")
+        o.hide_inactive = true;
+      else if (v == "show")
+        o.hide_inactive = false;
       else
-        throw std::invalid_argument(
-            "invalid --sort '" + v +
-            "': expected one of native,endpoint,allowed,mru,lru,rx-bytes,"
-            "tx-bytes,bytes,rx-rate,tx-rate,rate (or 'help')");
+        throw std::invalid_argument("invalid --inactive '" + v +
+                                    "': expected one of hide,show");
+    } else if (a == "--public-keys") {
+      const std::string v = need_value(i, "--public-keys");
+      if (v == "show")
+        o.show_keys = true;
+      else if (v == "hide")
+        o.show_keys = false;
+      else
+        throw std::invalid_argument("invalid --public-keys '" + v +
+                                    "': expected one of show,hide");
     } else {
       throw std::invalid_argument("unknown option '" + a + "'");
     }

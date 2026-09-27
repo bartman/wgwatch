@@ -43,10 +43,19 @@ struct HelpRequested {};
 // Thrown for --sort help (main prints sort_help(), exits 0).
 struct SortHelpRequested {};
 
-CliOptions parse_cli(int argc, char* argv[]);
+// Flags present on argv overwrite base; absent ones keep base values.
+// Lets the config file provide defaults that CLI overrides.
+CliOptions parse_cli(int argc, char* argv[],
+                      CliOptions base = CliOptions{});
 std::string usage();      // full --help text
 std::string sort_help();  // sort type list for --sort help
 std::string sort_name(SortKey s);
 SortKey next_sort(SortKey s);  // cycle order for the 's' key
 std::string plot_name(PlotMode m);
 PlotMode next_plot(PlotMode m);  // toggle for the 'p' key
+
+// Validated value parsers shared by parse_cli and the config file.
+// Throw std::invalid_argument on bad input.
+SortKey sort_from_name(const std::string& v);
+PlotMode plot_from_name(const std::string& v);
+double update_from_string(const std::string& v);

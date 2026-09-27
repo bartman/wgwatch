@@ -27,6 +27,8 @@
 - `cmake/*.cmake`: FetchContent packages (SYSTEM + FIND_PACKAGE_ARGS).
 - `src/theme.hpp`: 12 built-in themes (terminalcolors.com palettes);
   `theme_at()` wraps for the `t` key.
+- `src/config.hpp`: `~/.config/wgwatch/config` load/save (atomic
+  rewrite); toggles persist, CLI flags override the file.
 - `package.nix` / `default.nix`: nix derivation + non-flake entry
 - `RELEASE.md`: release checklist (bump → tag → push).
 

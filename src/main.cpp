@@ -7,6 +7,7 @@
 
 #include "cli.hpp"
 #include "collector.hpp"
+#include "config.hpp"
 #include "cpptui.hpp"
 #include "rates.hpp"
 #include "sampler.hpp"
@@ -34,9 +35,9 @@ void setup_logging(const CliOptions& o) {
 
 int main(int argc, char* argv[]) {
   try {
-    CliOptions opts = parse_cli(argc, argv);
+    CliOptions opts = parse_cli(argc, argv, wconfig::load_config());
     setup_logging(opts);
-    spdlog::info(
+    spdlog::debug(
         "wgwatch starting: update={:.3f}s interface={} remote={} sort={} "
         "keys={} verbose={} log={}",
         opts.update_sec, opts.interface,
@@ -60,12 +61,12 @@ int main(int argc, char* argv[]) {
                       });
                     });
     sampler.start();
-    spdlog::info("entering UI loop");
+    spdlog::debug("entering UI loop");
     app.run(ui.root());
-    spdlog::info("UI loop exited, stopping");
+    spdlog::debug("UI loop exited, stopping");
     sampler.stop();
     col.stop();
-    spdlog::info("wgwatch stopped");
+    spdlog::debug("wgwatch stopped");
   } catch (const HelpRequested&) {
     fmt::print("{}", usage());
     return 0;

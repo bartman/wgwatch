@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 #include "cpptui.hpp"
@@ -62,6 +63,19 @@ inline constexpr std::array<Theme, 12> kThemes = {{
     {"one-dark", "#282c34", "#abb2bf", "#5c6370", "#61afef", "#98c379",
      "#56b6c2", "#98c379", "#d19a66", "#e06c75"},
 }};
+// Name -> index for --theme and the config file. False when unknown.
+inline bool theme_index(const char* name, std::size_t& out) {
+  for (std::size_t i = 0; i < kThemes.size(); ++i)
+    if (std::strcmp(kThemes[i].name, name) == 0) {
+      out = i;
+      return true;
+    }
+  return false;
+}
+
+inline bool theme_index(const std::string& name, std::size_t& out) {
+  return theme_index(name.c_str(), out);
+}
 
 inline constexpr std::size_t num_themes() { return kThemes.size(); }
 
