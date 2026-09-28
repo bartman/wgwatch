@@ -35,9 +35,11 @@ class Collector {
   void start(const CliOptions& o);
   void stop();
   int fd() const { return fd_; }
+  int err_fd() const { return err_fd_; }
 
  private:
   int fd_ = -1;
+  int err_fd_ = -1;
   int pid_ = -1;
   bool group_ok_ = false;
 };

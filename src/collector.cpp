@@ -118,11 +118,21 @@ void Collector::start(const CliOptions& o) {
   if (::pipe2(fds, O_CLOEXEC | O_NONBLOCK) != 0)
     throw std::runtime_error(std::string("pipe2 failed: ") +
                              std::strerror(errno));
+  int err[2] = {-1, -1};
+  if (::pipe2(err, O_CLOEXEC | O_NONBLOCK) != 0) {
+    const int e = errno;
+    ::close(fds[0]);
+    ::close(fds[1]);
+    throw std::runtime_error(std::string("pipe2 failed: ") +
+                             std::strerror(e));
+  }
   const pid_t pid = ::fork();
   if (pid < 0) {
     const int e = errno;
     ::close(fds[0]);
     ::close(fds[1]);
+    ::close(err[0]);
+    ::close(err[1]);
     throw std::runtime_error(std::string("fork failed: ") +
                              std::strerror(e));
   }
@@ -132,8 +142,11 @@ void Collector::start(const CliOptions& o) {
     ::prctl(PR_SET_PDEATHSIG, SIGTERM);
     if (::getppid() == 1) ::_exit(127);  // already orphaned
     ::dup2(fds[1], STDOUT_FILENO);
+    ::dup2(err[1], STDERR_FILENO);
     ::close(fds[0]);
     ::close(fds[1]);
+    ::close(err[0]);
+    ::close(err[1]);
     if (o.remote) {
       const std::string cmd = build_remote_command(o);
       const std::vector<std::string> args = build_ssh_argv(o, cmd);
@@ -151,14 +164,16 @@ void Collector::start(const CliOptions& o) {
     ::_exit(127);
   }
   ::close(fds[1]);
+  ::close(err[1]);
   // Join (or confirm) the child's group so stop() can signal the whole
   // tree. EACCES means the child already exec'd after setting its own
   // group, which is the outcome we want anyway.
   group_ok_ = (::setpgid(pid, pid) == 0 || errno == EACCES);
   fd_ = fds[0];
+  err_fd_ = err[0];
   pid_ = static_cast<int>(pid);
-  spdlog::debug("collector: started pid={} fd={} group_kill={}", pid_, fd_,
-               group_ok_);
+  spdlog::debug("collector: started pid={} fd={} err_fd={} group_kill={}",
+                pid_, fd_, err_fd_, group_ok_);
 }
 
 void Collector::stop() {
@@ -191,5 +206,9 @@ void Collector::stop() {
   if (fd_ != -1) {
     ::close(fd_);
     fd_ = -1;
+  }
+  if (err_fd_ != -1) {
+    ::close(err_fd_);
+    err_fd_ = -1;
   }
 }

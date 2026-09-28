@@ -1,13 +1,13 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <optional>
-#include <string>
-#include <vector>
 
 #include "cpptui.hpp"
 #include "cli.hpp"
@@ -212,6 +212,36 @@ class CompressedBox : public cpptui::Border {
   std::vector<int> seps_;
 };
 
+// One collector-stderr line with its arrival stamp. TTL is enforced per
+// refresh (see kErrTtlSec).
+struct ErrLine {
+  std::chrono::steady_clock::time_point at;
+  std::string text;
+};
+
+// Overlay container pinned just above the 1-row footer: its single child
+// keeps full width and its caller-set fixed_height, sitting at
+// y + height - 1 - H (the -1 reserves the footer row). Container::render
+// already skips invisible children, so visible=false fully hides it.
+class BottomPin : public cpptui::Container {
+ public:
+  void layout() override {
+    for (auto& child : children_) {
+      if (!child->visible) continue;
+      child->x = x;
+      child->width =
+          child->fixed_width > 0
+              ? child->fixed_width
+              : clamp_size(width, child->min_width, child->max_width);
+      const int h = child->fixed_height > 0 ? child->fixed_height : height;
+      child->height = h;
+      child->y = y + height - 1 - h;
+      if (auto cont = std::dynamic_pointer_cast<Container>(child))
+        cont->layout();
+    }
+  }
+};
+
 // Root layout owner. refresh() runs on the UI thread only (wired via
 // App::post from the sampler callback). Keys: q quit, k keys, s sort,
 // p plot mode, t theme.
@@ -221,13 +251,69 @@ class Ui {
 
   std::shared_ptr<cpptui::Widget> root() const { return root_; }
   void refresh(const WgFrame& frame);
+  // UI thread only; stamps steady_clock::now(). Shown until kErrTtlSec.
+  void push_error(std::string text) {
+    errors_.push_back({std::chrono::steady_clock::now(), std::move(text)});
+  }
+
+  static constexpr double kErrTtlSec = 5.0;
 
  private:
   cpptui::App* app_;
   CliOptions* opts_;
   RateTracker* tracker_;
-  std::shared_ptr<cpptui::Vertical> root_;
+  std::shared_ptr<cpptui::Stack> root_;
+  std::shared_ptr<cpptui::Vertical> content_;
   std::shared_ptr<cpptui::Label> header_;
   std::shared_ptr<cpptui::Label> footer_;
+  std::shared_ptr<BottomPin> err_overlay_;
+  std::deque<ErrLine> errors_;
   WgFrame last_;
 };
+
+// Greedy codepoint wrap at max_w display columns, hard-splitting mid-word.
+// Empty input (or max_w <= 0) -> empty vector. Pure: unit-tested.
+inline std::vector<std::string> wrap_lines(const std::string& text,
+                                           int max_w) {
+  std::vector<std::string> rows;
+  if (text.empty() || max_w <= 0) return rows;
+  std::string cur;
+  int w = 0;
+  std::size_t pos = 0;
+  while (pos < text.size()) {
+    uint32_t cp = 0;
+    int len = 0;
+    if (!cpptui::utf8_decode_codepoint(text, pos, cp, len) || len <= 0) break;
+    const int cw = cpptui::char_display_width(cp);
+    if (w + cw > max_w && !cur.empty()) {
+      rows.push_back(cur);
+      cur.clear();
+      w = 0;
+      continue;
+    }
+    cur.append(text, pos, static_cast<std::size_t>(len));
+    w += cw;
+    pos += static_cast<std::size_t>(len);
+  }
+  if (!cur.empty()) rows.push_back(cur);
+  return rows;
+}
+
+// Drop entries older than kErrTtlSec. Pure: unit-tested.
+inline void prune_errors(std::deque<ErrLine>& errors,
+                         std::chrono::steady_clock::time_point now) {
+  while (!errors.empty() &&
+         std::chrono::duration<double>(now - errors.front().at).count() >
+             Ui::kErrTtlSec)
+    errors.pop_front();
+}
+
+// Wrap every record at max_w columns and flatten to display rows. Pure:
+// unit-tested.
+inline std::vector<std::string> error_box_rows(
+    const std::deque<ErrLine>& errors, int max_w) {
+  std::vector<std::string> rows;
+  for (const auto& e : errors)
+    for (auto& r : wrap_lines(e.text, max_w)) rows.push_back(std::move(r));
+  return rows;
+}

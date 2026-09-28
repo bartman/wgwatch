@@ -144,8 +144,14 @@ TEST(Refresh, BoxesPeersWithHeaderAndFooter) {
   const auto root =
       std::dynamic_pointer_cast<cpptui::Container>(ui.root());
   ASSERT_NE(root, nullptr);
+  // Stack root: content column + (hidden) error overlay.
+  ASSERT_EQ(root->get_children().size(), 2u);
+  EXPECT_FALSE(root->get_children()[1]->visible);
+  const auto column =
+      std::dynamic_pointer_cast<cpptui::Container>(root->get_children()[0]);
+  ASSERT_NE(column, nullptr);
   // header, flex body (interface line + two peer boxes), footer.
-  const auto& kids = root->get_children();
+  const auto& kids = column->get_children();
   ASSERT_EQ(kids.size(), 3u);
   EXPECT_NE(std::dynamic_pointer_cast<cpptui::Label>(kids[0]), nullptr);
   EXPECT_NE(std::dynamic_pointer_cast<cpptui::Label>(kids[2]), nullptr);
@@ -191,8 +197,13 @@ TEST(Refresh, StaleFrameShowsErrAndFooter) {
   const auto root =
       std::dynamic_pointer_cast<cpptui::Container>(ui.root());
   ASSERT_NE(root, nullptr);
+  // Stack root: content column + (hidden) error overlay.
+  ASSERT_EQ(root->get_children().size(), 2u);
+  const auto column =
+      std::dynamic_pointer_cast<cpptui::Container>(root->get_children()[0]);
+  ASSERT_NE(column, nullptr);
   // header, flex body holding the ERR line, footer.
-  const auto& kids = root->get_children();
+  const auto& kids = column->get_children();
   ASSERT_EQ(kids.size(), 3u);
   const auto body =
       std::dynamic_pointer_cast<cpptui::Container>(kids[1]);
@@ -216,8 +227,10 @@ TEST(Refresh, HideInactiveFiltersNeverHandshook) {
     ui.refresh(frame);
     const auto root =
         std::dynamic_pointer_cast<cpptui::Container>(ui.root());
+    const auto column = std::dynamic_pointer_cast<cpptui::Container>(
+        root->get_children()[0]);
     const auto body = std::dynamic_pointer_cast<cpptui::Container>(
-        root->get_children()[1]);
+        column->get_children()[1]);
     return body->get_children().size();
   };
   // iface + two boxes vs one box hidden (inside the flex body).
@@ -277,8 +290,13 @@ TEST(Refresh, CompressedSharesOneBoxWithSeparators) {
   const auto root =
       std::dynamic_pointer_cast<cpptui::Container>(ui.root());
   ASSERT_NE(root, nullptr);
+  // Stack root: content column + (hidden) error overlay.
+  ASSERT_EQ(root->get_children().size(), 2u);
+  const auto column =
+      std::dynamic_pointer_cast<cpptui::Container>(root->get_children()[0]);
+  ASSERT_NE(column, nullptr);
   // header, flex body (interface line + shared box), footer.
-  const auto& kids = root->get_children();
+  const auto& kids = column->get_children();
   ASSERT_EQ(kids.size(), 3u);
   const auto compressed_body =
       std::dynamic_pointer_cast<cpptui::Container>(kids[1]);
@@ -319,7 +337,12 @@ TEST(Refresh, OverflowKeepsFooterAndInfoRows) {
   root->width = 66;
   root->height = 34;
   root->layout();
-  const auto& kids = root->get_children();
+  const auto& stack_kids = root->get_children();
+  ASSERT_EQ(stack_kids.size(), 2u);
+  const auto column =
+      std::dynamic_pointer_cast<cpptui::Container>(stack_kids[0]);
+  ASSERT_NE(column, nullptr);
+  const auto& kids = column->get_children();
   ASSERT_EQ(kids.size(), 3u);
   const auto footer = kids[2];
   EXPECT_EQ(footer->height, 1);
@@ -340,4 +363,92 @@ TEST(Refresh, OverflowKeepsFooterAndInfoRows) {
   for (std::size_t i = 0; i < inner->get_children().size(); ++i)
     EXPECT_EQ(inner->get_children()[i]->height, i < 29 ? 1 : 0)
         << "child " << i;
+}
+
+TEST(WrapLines, AsciiSplitAndEdgeCases) {
+  EXPECT_TRUE(wrap_lines("", 10).empty());
+  EXPECT_TRUE(wrap_lines("abc", 0).empty());
+  EXPECT_EQ(wrap_lines("abcdef", 6), std::vector<std::string>{"abcdef"});
+  EXPECT_EQ(wrap_lines("abcdef", 5),
+            (std::vector<std::string>{"abcde", "f"}));
+  EXPECT_EQ(wrap_lines("abcdefghij", 3),
+            (std::vector<std::string>{"abc", "def", "ghi", "j"}));
+}
+
+TEST(WrapLines, WideCharBoundary) {
+  // U+3042 is double-width: "aあ" fills 3 columns, so "b" wraps.
+  EXPECT_EQ(wrap_lines("aあb", 3),
+            (std::vector<std::string>{"aあ", "b"}));
+  EXPECT_EQ(wrap_lines("ああ", 3),
+            (std::vector<std::string>{"あ", "あ"}));
+}
+
+TEST(PruneErrors, TtlBoundary) {
+  std::deque<ErrLine> errs;
+  const auto now = std::chrono::steady_clock::now();
+  errs.push_back({now - std::chrono::milliseconds(5100), "old"});
+  errs.push_back({now - std::chrono::milliseconds(4900), "new"});
+  prune_errors(errs, now);
+  ASSERT_EQ(errs.size(), 1u);
+  EXPECT_EQ(errs.front().text, "new");
+}
+
+TEST(ErrorBoxRows, WrapsAndFlattens) {
+  std::deque<ErrLine> errs;
+  const auto now = std::chrono::steady_clock::now();
+  errs.push_back({now, "abcdef"});
+  errs.push_back({now, "gh"});
+  EXPECT_EQ(error_box_rows(errs, 4),
+            (std::vector<std::string>{"abcd", "ef", "gh"}));
+  EXPECT_TRUE(error_box_rows(errs, 0).empty());
+}
+
+TEST(BottomPin, PinsChildAboveFooter) {
+  BottomPin pin;
+  pin.x = 0;
+  pin.y = 0;
+  pin.width = 80;
+  pin.height = 24;
+  auto box = std::make_shared<cpptui::Border>(cpptui::BorderStyle::Single,
+                                              cpptui::Color::Red());
+  box->fixed_height = 5;
+  pin.add(box);
+  pin.visible = true;
+  pin.layout();
+  EXPECT_EQ(box->x, 0);
+  EXPECT_EQ(box->width, 80);
+  EXPECT_EQ(box->height, 5);
+  EXPECT_EQ(box->y, 24 - 1 - 5);
+}
+
+TEST(Refresh, PushErrorShowsBoxAboveFooter) {
+  cpptui::App app;
+  CliOptions opts;
+  RateTracker tracker;
+  tracker.ingest(synthetic_frame(1000.0, 100));
+  tracker.ingest(synthetic_frame(1001.0, 200));
+  Ui ui(app, opts, tracker);
+  ui.push_error("boom");
+  ui.refresh(synthetic_frame(1001.0, 200));
+  const auto root =
+      std::dynamic_pointer_cast<cpptui::Container>(ui.root());
+  ASSERT_NE(root, nullptr);
+  ASSERT_EQ(root->get_children().size(), 2u);
+  const auto overlay = std::dynamic_pointer_cast<cpptui::Container>(
+      root->get_children()[1]);
+  ASSERT_NE(overlay, nullptr);
+  EXPECT_TRUE(overlay->visible);
+  ASSERT_EQ(overlay->get_children().size(), 1u);
+  const auto box = std::dynamic_pointer_cast<cpptui::Border>(
+      overlay->get_children()[0]);
+  ASSERT_NE(box, nullptr);
+  EXPECT_EQ(box->fixed_height, 3);  // 1 row + top/bottom border
+  const auto inner =
+      std::dynamic_pointer_cast<cpptui::Container>(box->get_children()[0]);
+  ASSERT_NE(inner, nullptr);
+  ASSERT_EQ(inner->get_children().size(), 1u);
+  const auto lab = std::dynamic_pointer_cast<cpptui::Label>(
+      inner->get_children()[0]);
+  ASSERT_NE(lab, nullptr);
+  EXPECT_NE(lab->get_text().find("boom"), std::string::npos);
 }

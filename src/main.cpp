@@ -52,12 +52,18 @@ int main(int argc, char* argv[]) {
     col.start(opts);
     const double stall_after =
         opts.update_sec * 2.5 > 3.0 ? opts.update_sec * 2.5 : 3.0;
-    Sampler sampler(col.fd(), opts.interface, stall_after, tracker,
+    Sampler sampler(col.fd(), col.err_fd(), opts.interface, stall_after,
+                    tracker,
                     [&](WgFrame f) {
                       app.post([&, f = std::move(f)]() mutable {
                         spdlog::trace("ui: frame t={:.3f} peers={} stale={}",
                                       f.tstamp, f.peers.size(), f.stale);
                         ui.refresh(f);
+                      });
+                    },
+                    [&](std::string line) {
+                      app.post([&, line = std::move(line)]() mutable {
+                        ui.push_error(std::move(line));
                       });
                     });
     sampler.start();

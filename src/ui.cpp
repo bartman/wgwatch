@@ -93,11 +93,17 @@ void PlotWidget::render(cpptui::Buffer& buffer) {
 
 Ui::Ui(cpptui::App& app, CliOptions& opts, RateTracker& tracker)
     : app_(&app), opts_(&opts), tracker_(&tracker) {
-  root_ = std::make_shared<cpptui::Vertical>();
+  root_ = std::make_shared<cpptui::Stack>();
+  content_ = std::make_shared<cpptui::Vertical>();
+  err_overlay_ = std::make_shared<BottomPin>();
+  err_overlay_->visible = false;
+  err_overlay_->focusable = false;
+  root_->add(content_);
+  root_->add(err_overlay_);
   header_ = std::make_shared<cpptui::Label>(cpptui::StyledText("wgwatch"));
   footer_ = std::make_shared<cpptui::Label>(cpptui::StyledText(""));
-  root_->add(header_);
-  root_->add(footer_);
+  content_->add(header_);
+  content_->add(footer_);
   app_->register_exit_key('q');
   app_->register_key('k', [this] {
     opts_->show_keys = !opts_->show_keys;
@@ -143,7 +149,40 @@ void Ui::refresh(const WgFrame& frame) {
   const cpptui::Color erc = wtheme::color(th.err);
 
   const auto [term_cols, term_rows] = term_size();
-  root_->clear_children();
+  // Stderr overlay: prune expired lines, then (re)build the red box pinned
+  // above the footer. Hidden entirely when no live lines remain.
+  prune_errors(errors_, std::chrono::steady_clock::now());
+  err_overlay_->clear_children();
+  if (errors_.empty()) {
+    err_overlay_->visible = false;
+  } else {
+    auto rows = error_box_rows(errors_, term_cols - 2);
+    const int max_rows = term_rows - 1 - 2;
+    if (max_rows <= 0) {
+      err_overlay_->visible = false;
+    } else {
+      if (static_cast<int>(rows.size()) > max_rows)
+        rows.erase(rows.begin(), rows.end() - max_rows);
+      const cpptui::Color red = cpptui::Color::Red();
+      auto box =
+          std::make_shared<cpptui::Border>(cpptui::BorderStyle::Single, red);
+      box->focusable = false;
+      box->fixed_height = static_cast<int>(rows.size()) + 2;
+      auto err_body = std::make_shared<cpptui::Vertical>();
+      err_body->focusable = false;
+      for (auto& r : rows) {
+        auto lab = std::make_shared<cpptui::Label>(
+            cpptui::StyledText().colored(r, red), red);
+        lab->focusable = false;
+        lab->selectable = false;
+        err_body->add(lab);
+      }
+      box->add(err_body);
+      err_overlay_->add(box);
+      err_overlay_->visible = true;
+    }
+  }
+  content_->clear_children();
   header_->set_text(to_styled(fit_runs(
       {{fmt::format("wgwatch | {} | {} peers | last {} shown",
                      opts_->remote ? *opts_->remote : std::string("local"),
@@ -152,11 +191,11 @@ void Ui::refresh(const WgFrame& frame) {
         hdc}},
       term_cols)));
   header_->fg_color = hdc;
-  root_->add(header_);
+  content_->add(header_);
   // Flex body between the fixed header/footer: on overflow the body clips
   // internally, so the footer (key hints) is never pushed off-screen.
   auto body = std::make_shared<cpptui::Vertical>();
-  root_->add(body);
+  content_->add(body);
   const auto add_footer = [&] {
     footer_->set_text(to_styled(fit_runs(
         {{fmt::format(
@@ -168,7 +207,7 @@ void Ui::refresh(const WgFrame& frame) {
           dim}},
         term_cols)));
     footer_->fg_color = dim;
-    root_->add(footer_);
+    content_->add(footer_);
   };
   if (frame.stale) {
     body->add(std::make_shared<cpptui::Label>(

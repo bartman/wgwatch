@@ -23,8 +23,9 @@ struct ev_timer;
 class Sampler {
  public:
   using Cb = std::function<void(WgFrame)>;
-  Sampler(int fd, std::string filter, double stall_after_sec,
-          RateTracker& tracker, Cb cb);
+  using ErrCb = std::function<void(std::string)>;
+  Sampler(int fd, int err_fd, std::string filter, double stall_after_sec,
+          RateTracker& tracker, Cb cb, ErrCb err_cb);
   ~Sampler();
   Sampler(const Sampler&) = delete;
   Sampler& operator=(const Sampler&) = delete;
@@ -34,27 +35,33 @@ class Sampler {
 
  private:
   static void io_cb(struct ev_loop* loop, struct ev_io* w, int revents);
+  static void err_cb(struct ev_loop* loop, struct ev_io* w, int revents);
   static void wake_cb(struct ev_loop* loop, struct ev_async* w, int revents);
   static void timer_cb(struct ev_loop* loop, struct ev_timer* w, int revents);
   void run();
   void on_data();
+  void on_err_data();
   void on_timeout();
   void emit_block();
   void emit_stale();
 
   int fd_;
+  int err_fd_;
   std::string filter_;
   double stall_after_sec_;
   RateTracker* tracker_;
   Cb cb_;
+  ErrCb err_cb_;
   std::thread thread_;
   bool running_ = false;
   std::atomic<struct ev_loop*> loop_{nullptr};
   struct ev_io* io_;
+  struct ev_io* err_io_;
   struct ev_async* wake_;
   struct ev_timer* timer_;
   std::chrono::steady_clock::time_point last_rx_;
   std::string buf_;
+  std::string err_buf_;
   std::string cur_;
   double cur_ts_ = 0.0;
   bool have_block_ = false;

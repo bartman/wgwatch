@@ -26,14 +26,18 @@ bool is_ts_line(const std::string& line) {
 
 }  // namespace
 
-Sampler::Sampler(int fd, std::string filter, double stall_after_sec,
-                 RateTracker& tracker, Cb cb)
+Sampler::Sampler(int fd, int err_fd, std::string filter,
+                 double stall_after_sec, RateTracker& tracker, Cb cb,
+                 ErrCb err_cb)
     : fd_(fd),
+      err_fd_(err_fd),
       filter_(std::move(filter)),
       stall_after_sec_(stall_after_sec),
       tracker_(&tracker),
-      cb_(std::move(cb)) {
+      cb_(std::move(cb)),
+      err_cb_(std::move(err_cb)) {
   io_ = new ev_io;
+  err_io_ = new ev_io;
   wake_ = new ev_async;
   timer_ = new ev_timer;
   last_rx_ = std::chrono::steady_clock::now();
@@ -42,12 +46,18 @@ Sampler::Sampler(int fd, std::string filter, double stall_after_sec,
 Sampler::~Sampler() {
   stop();
   delete io_;
+  delete err_io_;
   delete wake_;
   delete timer_;
 }
 
 void Sampler::io_cb(struct ev_loop* /*loop*/, struct ev_io* w, int /*revents*/) {
   static_cast<Sampler*>(w->data)->on_data();
+}
+
+void Sampler::err_cb(struct ev_loop* /*loop*/, struct ev_io* w,
+                     int /*revents*/) {
+  static_cast<Sampler*>(w->data)->on_err_data();
 }
 
 void Sampler::wake_cb(struct ev_loop* loop, struct ev_async* /*w*/,
@@ -68,6 +78,12 @@ void Sampler::run() {
   ev_io_init(io_, &Sampler::io_cb, fd_, EV_READ);
   io_->data = this;
   ev_io_start(loop, io_);
+  const bool watch_err = err_fd_ >= 0;
+  if (watch_err) {
+    ev_io_init(err_io_, &Sampler::err_cb, err_fd_, EV_READ);
+    err_io_->data = this;
+    ev_io_start(loop, err_io_);
+  }
   ev_async_init(wake_, &Sampler::wake_cb);
   ev_async_start(loop, wake_);
   ev_timer_init(timer_, &Sampler::timer_cb, stall_after_sec_,
@@ -77,6 +93,7 @@ void Sampler::run() {
   last_rx_ = std::chrono::steady_clock::now();
   ev_run(loop, 0);
   ev_io_stop(loop, io_);
+  if (watch_err) ev_io_stop(loop, err_io_);
   ev_async_stop(loop, wake_);
   ev_timer_stop(loop, timer_);
   loop_.store(nullptr);
@@ -172,5 +189,47 @@ void Sampler::on_data() {
     if (have_block_) emit_block();
     emit_stale();
     if (struct ev_loop* loop = loop_.load()) ev_break(loop, EVBREAK_ALL);
+  }
+}
+
+void Sampler::on_err_data() {
+  char tmp[65536];
+  bool eof = false;
+  std::size_t got = 0;
+  while (true) {
+    const ssize_t n = ::read(err_fd_, tmp, sizeof(tmp));
+    if (n > 0) {
+      err_buf_.append(tmp, static_cast<std::size_t>(n));
+      got += static_cast<std::size_t>(n);
+    } else if (n == 0) {
+      eof = true;
+      break;
+    } else {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+      spdlog::warn("wgwatch: collector stderr read error: {}",
+                   std::strerror(errno));
+      eof = true;
+      break;
+    }
+  }
+  if (got > 0)
+    spdlog::trace("sampler: stderr read {}B (buffered {}B)", got,
+                  err_buf_.size());
+  size_t start = 0;
+  while (true) {
+    const size_t nl = err_buf_.find('\n', start);
+    if (nl == std::string::npos) break;
+    std::string line = err_buf_.substr(start, nl - start);
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (!line.empty()) err_cb_(std::move(line));
+    start = nl + 1;
+  }
+  err_buf_.erase(0, start);
+  if (eof) {
+    if (!err_buf_.empty()) {
+      err_cb_(std::move(err_buf_));
+      err_buf_.clear();
+    }
+    if (struct ev_loop* loop = loop_.load()) ev_io_stop(loop, err_io_);
   }
 }

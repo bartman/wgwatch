@@ -221,7 +221,23 @@ def load_state(now):
     try:
         with open(STATE_PATH) as f:
             st = json.load(f)
-        if st.get("sup", st.get("ppid")) != supervisor_pid():
+        stored = st.get("sup", st.get("ppid"))
+        if stored != supervisor_pid():
+            alive = False
+            try:
+                os.kill(int(stored), 0)
+                alive = True
+            except ProcessLookupError:
+                alive = False
+            except PermissionError:
+                alive = True
+            except (OSError, ValueError, TypeError):
+                alive = False
+            if alive:
+                sys.stderr.write(
+                    f"fake-wg: state {STATE_PATH} owned by live supervisor "
+                    f"pid {stored}; rm {STATE_PATH} to start over\n")
+                sys.exit(1)
             return fresh_state(now), True
         st.setdefault("rx", {})
         st.setdefault("tx", {})
