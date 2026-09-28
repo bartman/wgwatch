@@ -20,9 +20,9 @@ Peer n always gets endpoint n.n.n.n:<50000+n>, allowed IPs
 ports 51820+N, and matching fabricated private/public keys. Handshakes
 report the current time, so all peers always look freshly connected.
 
-FAKE_WG_LOAD is a flat sequence split on "," and "/" and dealt out as
-rx,tx,rx,tx... over the peers in global order (a bare name covers one
-direction; the list cycles if shorter than 2*peers). Rates are MB/s
+FAKE_WG_LOAD is a flat sequence split on "," and "/" (equivalent) and
+dealt out as rx,tx,rx,tx... over the peers in global order (each name
+covers one direction; the list cycles if shorter than 2*peers). Rates are MB/s
 (1024*1024 bytes) against FAKE_WG_LOW/MID/HIGH (default 1/2/4):
 zero holds 0; low/mid/high hold their level; random draws
 uniform(0, HIGH) each poll; bursty holds low 1s, mid 1s, high 4s,
@@ -43,8 +43,10 @@ Environment (all optional):
                         (default "1,2": 1 peer on wg0, 2 on wg1;
                         short lists pad with 0)
     FAKE_WG_LOAD        flat load sequence, see above
-                        (default "sin/cos,bursty,bursty,random,random")
-    FAKE_WG_LOW/MID/HIGH  MB/s levels (default 1/2/4)
+                        (default "sin,cos,bursty,bursty,random,random")
+    FAKE_WG_DEBUG         path for per-poll supervisor diagnostics
+                        (unset/empty disables; never stdout: the dump
+                        stream must stay clean)
 """
 
 import base64
@@ -65,7 +67,7 @@ MAX_DT = 5.0
 FIRST_DT = 1.0
 DEFAULT_INTERFACES = 2
 DEFAULT_PEERS = [1, 2]
-DEFAULT_LOAD = "sin/cos,bursty,bursty,random,random"
+DEFAULT_LOAD = "sin,cos,bursty,bursty,random,random"
 DEFAULT_LOW, DEFAULT_MID, DEFAULT_HIGH = 1.0, 2.0, 4.0
 
 
@@ -177,6 +179,37 @@ def supervisor_pid():
     return pid or os.getppid()
 
 
+def supervisor_chain():
+    """Ancestor (pid, argv0-basename) pairs from parent upward, for debug."""
+    chain = []
+    pid = os.getppid()
+    for _ in range(6):
+        if not pid:
+            break
+        base = os.path.basename(proc_argv0(pid))
+        chain.append([pid, base])
+        if base not in _WRAPPERS:
+            break
+        pid = proc_ppid(pid)
+    return chain
+
+
+def debug_event(sup, reset):
+    """Sidecar trace; never touches stdout (the dump)."""
+    path = os.environ.get("FAKE_WG_DEBUG", "")
+    if not path:
+        return
+    try:
+        with open(path, "a") as f:
+            f.write(json.dumps({
+                "t": round(time.time(), 3),
+                "pid": os.getpid(),
+                "sup": sup,
+                "chain": supervisor_chain(),
+                "reset": reset,
+            }) + "\n")
+    except OSError:
+        pass
 def fresh_state(now):
     # Backdate "last" so the first poll after a reset already carries one
     # interval of data instead of zeros.
@@ -189,12 +222,12 @@ def load_state(now):
         with open(STATE_PATH) as f:
             st = json.load(f)
         if st.get("sup", st.get("ppid")) != supervisor_pid():
-            return fresh_state(now)
+            return fresh_state(now), True
         st.setdefault("rx", {})
         st.setdefault("tx", {})
-        return st
+        return st, False
     except (OSError, ValueError, AttributeError):
-        return fresh_state(now)
+        return fresh_state(now), True
 
 
 def main():
@@ -211,7 +244,8 @@ def main():
     high = getenv_float("FAKE_WG_HIGH", DEFAULT_HIGH)
 
     now = time.time()
-    st = load_state(now)
+    st, reset = load_state(now)
+    debug_event(st["sup"], reset)
     t0 = st.get("t0", now)
     dt = max(0.0, min(now - st.get("last", now), MAX_DT))
     t = max(0.0, now - t0)

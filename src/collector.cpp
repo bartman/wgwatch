@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cerrno>
+#include <cstdlib>
 #include <chrono>
 #include <csignal>
 #include <cstring>
@@ -26,6 +27,53 @@ constexpr const char* kTrap = "trap 'exit 0' HUP TERM INT PIPE; ";
 
 }  // namespace
 
+namespace {
+
+constexpr const char* kFakeWgVars[] = {
+    "FAKE_WG_INTERFACES", "FAKE_WG_PEERS", "FAKE_WG_LOAD", "FAKE_WG_LOW",
+    "FAKE_WG_MID",        "FAKE_WG_HIGH",  "FAKE_WG_DEBUG", nullptr,
+};
+
+}  // namespace
+
+std::string sh_quote(const std::string& v) {
+  std::string q = "'";
+  for (char c : v) {
+    if (c == '\'')
+      q += "'\\''";
+    else
+      q += c;
+  }
+  q += "'";
+  return q;
+}
+
+std::string fake_wg_env_prefix() {
+  std::string out;
+  for (const char* const* name = kFakeWgVars; *name != nullptr; ++name) {
+    const char* val = std::getenv(*name);
+    if (val != nullptr) {
+      out += *name;
+      out += "=";
+      out += sh_quote(val);
+      out += " ";
+    }
+  }
+  return out;
+}
+
+namespace {
+
+// Full invocation with forwarded tuning ("env A='..' wg") or the bare
+// command when nothing is set (byte-identical to before).
+std::string wg_invocation(const CliOptions& o) {
+  const std::string envp = fake_wg_env_prefix();
+  if (envp.empty()) return o.command;
+  return "env " + envp + o.command;
+}
+
+}  // namespace
+
 std::string build_loop_command(const CliOptions& o) {
   const std::string sec = fmt::format("{:.3f}", o.update_sec);
   const std::string detect = priv::sudo_detect_snippet();
@@ -33,11 +81,11 @@ std::string build_loop_command(const CliOptions& o) {
     return fmt::format(
         "{}while true; do date +%s.%N || exit; {} show all dump; sleep {} || "
         "exit; done",
-        kTrap, o.command, sec);
+        kTrap, wg_invocation(o), sec);
   return fmt::format(
       "{}PRIV={}; while true; do date +%s.%N || exit; $PRIV {} show all dump; "
       "sleep {} || exit; done",
-      kTrap, detect, o.command, sec);
+      kTrap, detect, wg_invocation(o), sec);
 }
 
 std::string build_remote_command(const CliOptions& o) {
@@ -48,7 +96,7 @@ std::string build_remote_command(const CliOptions& o) {
   return fmt::format(
       "{}SUDO={}; while true; do date +%s.%N || exit; $SUDO {} show all dump; "
       "sleep {} || exit; done",
-      kTrap, detect, o.command, sec);
+      kTrap, detect, wg_invocation(o), sec);
 }
 
 std::vector<std::string> build_ssh_argv(const CliOptions& o,

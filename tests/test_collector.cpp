@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+
 #include <string>
 #include <vector>
 
@@ -62,4 +64,36 @@ TEST(CollectorCmd, CustomCommandReplacesWg) {
             std::string::npos);
   EXPECT_NE(build_remote_command(o).find("/my/version/of/wg show all dump"),
             std::string::npos);
+}
+
+TEST(CollectorCmd, ShQuoteWrapsAndEscapes) {
+  EXPECT_EQ(sh_quote("wg"), "'wg'");
+  EXPECT_EQ(sh_quote("/my/version/of/wg"), "'/my/version/of/wg'");
+  EXPECT_EQ(sh_quote("a'b"), "'a'\\''b'");
+  EXPECT_EQ(sh_quote(""), "''");
+}
+
+TEST(CollectorCmd, EnvPrefixEmptyByDefault) {
+  ::unsetenv("FAKE_WG_LOAD");
+  ::unsetenv("FAKE_WG_DEBUG");
+  EXPECT_EQ(fake_wg_env_prefix(), "");
+  CliOptions o;
+  EXPECT_NE(build_loop_command(o).find("wg show all dump"),
+            std::string::npos);
+  EXPECT_EQ(build_loop_command(o).find("env "), std::string::npos);
+}
+
+TEST(CollectorCmd, EnvPrefixForwardsFakeTuning) {
+  ::setenv("FAKE_WG_LOAD", "mid/mid", 1);
+  ::setenv("FAKE_WG_DEBUG", "fake-wg-state.log", 1);
+  const std::string prefix = fake_wg_env_prefix();
+  EXPECT_NE(prefix.find("FAKE_WG_LOAD='mid/mid'"), std::string::npos);
+  EXPECT_NE(prefix.find("FAKE_WG_DEBUG='fake-wg-state.log'"),
+            std::string::npos);
+  EXPECT_EQ(prefix.find("FAKE_WG_LOW"), std::string::npos);
+  CliOptions o;
+  EXPECT_NE(build_loop_command(o).find("env FAKE_WG_LOAD='mid/mid'"),
+            std::string::npos);
+  ::unsetenv("FAKE_WG_LOAD");
+  ::unsetenv("FAKE_WG_DEBUG");
 }
