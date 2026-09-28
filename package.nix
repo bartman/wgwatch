@@ -2,7 +2,7 @@
 
 stdenv.mkDerivation {
   pname = "wgwatch";
-  version = "0.1.5";
+  version = "0.1.6";
   src = lib.cleanSource ./.;
   nativeBuildInputs = [ cmake ninja pkg-config ];
   buildInputs = [ fmt spdlog gtest libev ];

@@ -67,12 +67,12 @@ https://github.com/bartman/wgwatch/releases/latest
 
 On Debian based systems (from the download directory):
 ```sh
-sudo apt install ./wgwatch_0.1.5_amd64.deb
+sudo apt install ./wgwatch_0.1.6_amd64.deb
 ```
 
 On Fedora based systems (from the download directory):
 ```sh
-sudo dnf install ./wgwatch-0.1.5-1.x86_64.rpm
+sudo dnf install ./wgwatch-0.1.6-1.x86_64.rpm
 ```
 
 ## Options
