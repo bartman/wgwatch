@@ -4,6 +4,8 @@
 
 Top-like WireGuard monitor (C++20, CMake+Ninja, clang first).
 
+![wgwatch monitoring three peers](_attic/synthetic-1.png)
+
 ## Quickstart
 
 Debian / Fedora:
