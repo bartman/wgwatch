@@ -19,13 +19,23 @@
 // Plot height (normal mode): every peer box costs 5 fixed lines (top/bottom
 // border, info, allowed-ips, stats) plus h plot lines; each interface run
 // costs 1 header line; the header + footer cost 1 line each. All plots share
-// one height so boxes align: min 1, max 4 lines.
-inline int plot_height_for(int term_rows, int n_ifaces, int n_peers) {
+// one height so boxes align: min 1, max 4 lines. `fixed` is the per-box
+// fixed cost (4 when allowed-ips merges into the info line).
+inline int plot_height_for(int term_rows, int n_ifaces, int n_peers,
+                           int fixed = 5) {
   if (n_peers <= 0) return 4;
-  const int h = (term_rows - 2 - n_ifaces - 5 * n_peers) / n_peers;
+  const int h = (term_rows - 2 - n_ifaces - fixed * n_peers) / n_peers;
   if (h < 1) return 1;
   if (h > 4) return 4;
   return h;
+}
+
+// Normal mode squeezed to a 1-line plot on a wide (>= 80 col) terminal:
+// moving allowed-ips onto the info line frees a row for the plot.
+inline bool merge_allowed_ips(int term_rows, int term_cols, int n_ifaces,
+                              int n_peers) {
+  return term_cols >= 80 && plot_height_for(term_rows, n_ifaces, n_peers) == 1 &&
+         plot_height_for(term_rows, n_ifaces, n_peers, 4) > 1;
 }
 
 // Plot height (compressed mode): peers share one box per interface run, so

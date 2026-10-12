@@ -34,6 +34,16 @@ TEST(PlotHeight, MidRange) {
 
 TEST(PlotHeight, TinyTerminalFloor) { EXPECT_EQ(plot_height_for(10, 1, 5), 1); }
 
+TEST(MergeAllowedIps, OnlyWhenSqueezedAndWide) {
+  // 2 + 1 + 3*5 = 18 fixed; 21 rows -> h=1; merged: (21-3-12)/3 = 2.
+  EXPECT_TRUE(merge_allowed_ips(21, 80, 1, 3));
+  EXPECT_EQ(plot_height_for(21, 1, 3, 4), 2);
+  EXPECT_FALSE(merge_allowed_ips(21, 79, 1, 3));  // too narrow
+  EXPECT_FALSE(merge_allowed_ips(27, 120, 1, 3));  // h=3 already
+  // h=1 but merging gains nothing: (19-3-12)/3 = 1.
+  EXPECT_FALSE(merge_allowed_ips(19, 120, 1, 3));
+}
+
 TEST(BarRows, EmptyOnBadInput) {
   const auto h = ramp(10);
   EXPECT_TRUE(bar_rows(h, 0, 10, 3).empty());

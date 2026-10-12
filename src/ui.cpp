@@ -246,9 +246,11 @@ void Ui::refresh(const WgFrame& frame) {
   // (1 line, not 2) and merges allowed-IPs into the info line.
   const bool compressed =
       n_peers > 0 && term_rows < 2 + n_runs + n_peers * (5 + h_normal);
-  const int h = compressed
-                    ? compressed_plot_height(term_rows, n_runs, n_peers)
-                    : h_normal;
+  const bool merged =
+      !compressed && merge_allowed_ips(term_rows, term_cols, n_runs, n_peers);
+  const int h = compressed ? compressed_plot_height(term_rows, n_runs, n_peers)
+                : merged   ? plot_height_for(term_rows, n_runs, n_peers, 4)
+                           : h_normal;
   // Pre-truncation widths: box content is term_cols - 2, and each stats
   // cell mirrors its plot's flex share (remainder goes left, as flex does).
   const int inner_w = term_cols - 2;
@@ -358,11 +360,12 @@ void Ui::refresh(const WgFrame& frame) {
         const PeerState* st = peer_state(p);
         auto box =
             std::make_shared<cpptui::Border>(cpptui::BorderStyle::Single, dim);
-        box->fixed_height = 5 + h;
+        box->fixed_height = (merged ? 4 : 5) + h;
         auto inner = std::make_shared<cpptui::Vertical>();
-        inner->add(fit_label(info_runs(p, false), inner_w, fg));
-        inner->add(fit_label({{ "(" + p.allowed_ips + ")", dim }}, inner_w,
-                             dim));
+        inner->add(fit_label(info_runs(p, merged), inner_w, fg));
+        if (!merged)
+          inner->add(fit_label({{ "(" + p.allowed_ips + ")", dim }}, inner_w,
+                               dim));
         inner->add(plots_row(st));
         inner->add(stats_row(p, st));
         box->add(inner);
