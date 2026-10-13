@@ -30,6 +30,10 @@ struct PeerState {
   uint64_t last_rx = 0;
   uint64_t last_tx = 0;
   double last_t = -1.0;
+  // Frame time of the last observed rx counter increase (data received
+  // *from* the peer); -1 until first seen. Tx increases are ignored: bytes
+  // we sent say nothing about the peer being alive.
+  double last_rx_activity = -1.0;
 };
 
 // Mean and peak over the retained rate window (what the plots show).
@@ -73,7 +77,8 @@ class RateTracker {
 
 // Peer display order for the UI (stable: ties keep wg order).
 // Byte/rate sorts run largest-first; endpoint/allowed/mru/lru ascend with
-// never-handshook (0) treated as oldest.
+// never-seen (no handshake, no rx activity) treated as oldest. mru/lru
+// key on max(handshake, last rx activity).
 std::vector<const WgPeer*> sort_peers(
     const WgFrame& frame, const std::map<std::string, PeerState>& states,
     SortKey sort);

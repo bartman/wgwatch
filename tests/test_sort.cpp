@@ -66,6 +66,39 @@ TEST(Sort, LruNeverFirst) {
   EXPECT_EQ(order_of(sort_peers(f, {}, SortKey::Lru)), "CAB");
 }
 
+TEST(Sort, MruRxActivityBeatsNewerHandshake) {
+  RateTracker tr;
+  WgFrame f1;
+  f1.tstamp = 1000.0;
+  f1.peers = {
+      peer("A", "10.0.0.2:1", "10.0.0.2/32", 200, 100, 0),
+      peer("B", "9.0.0.1:1", "10.0.0.1/32", 100, 300, 0),
+  };
+  WgFrame f2 = f1;
+  f2.tstamp = 1010.0;
+  f2.peers[1].rx = 400;  // data arrived from B after its handshake
+  tr.ingest(f1);
+  tr.ingest(f2);
+  EXPECT_EQ(order_of(sort_peers(f2, tr.peers(), SortKey::Mru)), "BA");
+  EXPECT_EQ(order_of(sort_peers(f2, tr.peers(), SortKey::Lru)), "AB");
+}
+
+TEST(Sort, MruIgnoresTxActivity) {
+  RateTracker tr;
+  WgFrame f1;
+  f1.tstamp = 1000.0;
+  f1.peers = {
+      peer("A", "10.0.0.2:1", "10.0.0.2/32", 200, 100, 0),
+      peer("B", "9.0.0.1:1", "10.0.0.1/32", 100, 300, 0),
+  };
+  WgFrame f2 = f1;
+  f2.tstamp = 1010.0;
+  f2.peers[1].tx = 500;  // we sent to B: says nothing about B, ignored
+  tr.ingest(f1);
+  tr.ingest(f2);
+  EXPECT_EQ(order_of(sort_peers(f2, tr.peers(), SortKey::Mru)), "AB");
+}
+
 TEST(Sort, RxBytesDesc) {
   const WgFrame f = three();
   EXPECT_EQ(order_of(sort_peers(f, {}, SortKey::RxBytes)), "BAC");
@@ -119,9 +152,29 @@ TEST(Sort, RateDesc) {
   EXPECT_EQ(order_of(sort_peers(f2, tr.peers(), SortKey::Rate)), "ACB");
 }
 
+TEST(Sort, HandshakeIgnoresRxActivity) {
+  RateTracker tr;
+  WgFrame f1;
+  f1.tstamp = 1000.0;
+  f1.peers = {
+      peer("A", "10.0.0.2:1", "10.0.0.2/32", 200, 100, 0),
+      peer("B", "9.0.0.1:1", "10.0.0.1/32", 100, 300, 0),
+  };
+  WgFrame f2 = f1;
+  f2.tstamp = 1010.0;
+  f2.peers[1].rx = 400;  // fresh rx on B: moves mru, not handshake
+  tr.ingest(f1);
+  tr.ingest(f2);
+  EXPECT_EQ(order_of(sort_peers(f2, tr.peers(), SortKey::Handshake)), "AB");
+  EXPECT_EQ(order_of(sort_peers(f2, tr.peers(), SortKey::Mru)), "BA");
+}
+
 TEST(Sort, NextSortCycles) {
   EXPECT_EQ(next_sort(SortKey::Mru), SortKey::Lru);
+  EXPECT_EQ(next_sort(SortKey::Lru), SortKey::Handshake);
   EXPECT_EQ(next_sort(SortKey::Rate), SortKey::Native);
   EXPECT_EQ(sort_name(SortKey::Bytes), "bytes");
   EXPECT_EQ(sort_name(SortKey::Mru), "mru");
+  EXPECT_EQ(sort_name(SortKey::Handshake), "handshake");
+  EXPECT_EQ(sort_from_name("handshake"), SortKey::Handshake);
 }

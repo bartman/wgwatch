@@ -15,6 +15,9 @@ void RateTracker::ingest(const WgFrame& f) {
     // so histories never start with a phantom zero.
     if (st.last_t >= 0.0 && f.tstamp > st.last_t) {
       const double dt = f.tstamp - st.last_t;
+      // Strict rx increase = data arrived from the peer (counter resets
+      // and flat counters record no activity).
+      if (p.rx > st.last_rx) st.last_rx_activity = f.tstamp;
       st.rx_rate = (p.rx >= st.last_rx)
                        ? static_cast<double>(p.rx - st.last_rx) / dt
                        : 0.0;
@@ -120,13 +123,10 @@ std::vector<const WgPeer*> sort_peers(
                          return x->allowed_ips < y->allowed_ips;
                        });
       break;
-    case SortKey::Mru:
-    case SortKey::Lru: {
-      const bool mru = sort == SortKey::Mru;
+    case SortKey::Handshake:
+      // Handshake time only: most recent first, never (0) last.
       std::stable_sort(out.begin(), out.end(),
-                       [mru](const WgPeer* x, const WgPeer* y) {
-                         // never (0) counts as oldest: last for mru, first
-                         // for lru.
+                       [](const WgPeer* x, const WgPeer* y) {
                          const int64_t kx =
                              x->handshake == 0
                                  ? -1
@@ -135,6 +135,26 @@ std::vector<const WgPeer*> sort_peers(
                              y->handshake == 0
                                  ? -1
                                  : static_cast<int64_t>(y->handshake);
+                         return kx > ky;
+                       });
+      break;
+    case SortKey::Mru:
+    case SortKey::Lru: {
+      const bool mru = sort == SortKey::Mru;
+      // Most recent of handshake and last rx activity; unseen (-1) counts
+      // as oldest: last for mru, first for lru.
+      const auto mru_key = [&states](const WgPeer& p) {
+        double k =
+            p.handshake == 0 ? -1.0 : static_cast<double>(p.handshake);
+        const auto it = states.find(p.iface + "|" + p.pubkey);
+        if (it != states.end() && it->second.last_rx_activity > k)
+          k = it->second.last_rx_activity;
+        return k;
+      };
+      std::stable_sort(out.begin(), out.end(),
+                       [&](const WgPeer* x, const WgPeer* y) {
+                         const double kx = mru_key(*x);
+                         const double ky = mru_key(*y);
                          return mru ? kx > ky : kx < ky;
                        });
       break;

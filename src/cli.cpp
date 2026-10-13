@@ -44,8 +44,9 @@ std::string sort_help() {
          "  native      order reported by wg\n"
          "  endpoint    sort by endpoint ip\n"
          "  allowed     sort by allowed ips\n"
-         "  mru         most recent handshake first (default)\n"
-         "  lru         least recent handshake first\n"
+         "  mru         most recent handshake or rx activity first (default)\n"
+         "  lru         least recent handshake or rx activity first\n"
+         "  handshake   most recent handshake first\n"
          "  rx-bytes    sort by rx bytes\n"
          "  tx-bytes    sort by tx bytes\n"
          "  bytes       sort by rx+tx bytes\n"
@@ -66,6 +67,8 @@ std::string sort_name(SortKey s) {
       return "mru";
     case SortKey::Lru:
       return "lru";
+    case SortKey::Handshake:
+      return "handshake";
     case SortKey::RxBytes:
       return "rx-bytes";
     case SortKey::TxBytes:
@@ -85,7 +88,8 @@ std::string sort_name(SortKey s) {
 SortKey next_sort(SortKey s) {
   static constexpr SortKey kOrder[] = {
       SortKey::Native,   SortKey::Endpoint, SortKey::Allowed,
-      SortKey::Mru,      SortKey::Lru,      SortKey::RxBytes,
+      SortKey::Mru,      SortKey::Lru,      SortKey::Handshake,
+      SortKey::RxBytes,
       SortKey::TxBytes,  SortKey::Bytes,    SortKey::RxRate,
       SortKey::TxRate,   SortKey::Rate,
   };
@@ -115,6 +119,7 @@ SortKey sort_from_name(const std::string& v) {
   if (v == "allowed") return SortKey::Allowed;
   if (v == "mru") return SortKey::Mru;
   if (v == "lru") return SortKey::Lru;
+  if (v == "handshake") return SortKey::Handshake;
   if (v == "rx-bytes") return SortKey::RxBytes;
   if (v == "tx-bytes") return SortKey::TxBytes;
   if (v == "bytes") return SortKey::Bytes;
@@ -123,7 +128,7 @@ SortKey sort_from_name(const std::string& v) {
   if (v == "rate") return SortKey::Rate;
   throw std::invalid_argument(
       "invalid --sort '" + v +
-      "': expected one of native,endpoint,allowed,mru,lru,rx-bytes,"
+      "': expected one of native,endpoint,allowed,mru,lru,handshake,rx-bytes,"
       "tx-bytes,bytes,rx-rate,tx-rate,rate (or 'help')");
 }
 

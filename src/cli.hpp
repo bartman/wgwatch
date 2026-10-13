@@ -8,8 +8,9 @@ enum class SortKey {
   Native,    // wg order
   Endpoint,  // endpoint ip
   Allowed,   // allowed ips
-  Mru,       // most recent handshake first
-  Lru,       // least recent handshake first
+  Mru,       // most recent handshake/rx activity first
+  Lru,       // least recent handshake/rx activity first
+  Handshake,  // most recent handshake first (ignores rx activity)
   RxBytes,
   TxBytes,
   Bytes,  // rx + tx bytes
