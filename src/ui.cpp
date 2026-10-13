@@ -335,6 +335,14 @@ void Ui::refresh(const WgFrame& frame) {
                        tx_w, fg));
     return row;
   };
+  // One shared path for both AllowedIPs lines: split on ',' (wireguard
+  // joins multiple entries), resolve each host, print (name=IP/mask) when
+  // known. Non-const: first sighting of an IP kicks off its background
+  // reverse lookup as a side effect.
+  const auto allowed_runs = [&](const WgPeer& p) {
+    return allowed_ip_text_runs(wdns::resolve_all(p.allowed_ips, dns_), fg,
+                                dim);
+  };
   const auto info_runs = [&](const WgPeer& p, bool merged) {
     const auto [ago, hc] = handshake(p);
     std::vector<TextRun> line = {
@@ -346,9 +354,8 @@ void Ui::refresh(const WgFrame& frame) {
         {hidden_key(p.pubkey, opts_->show_keys), fg},
     };
     if (merged) {
-      line.push_back({"  (", std::nullopt});
-      line.push_back({p.allowed_ips, dim});
-      line.push_back({")", std::nullopt});
+      line.push_back({"  ", std::nullopt});
+      for (auto& r : allowed_runs(p)) line.push_back(std::move(r));
     }
     return line;
   };
@@ -363,9 +370,7 @@ void Ui::refresh(const WgFrame& frame) {
         box->fixed_height = (merged ? 4 : 5) + h;
         auto inner = std::make_shared<cpptui::Vertical>();
         inner->add(fit_label(info_runs(p, merged), inner_w, fg));
-        if (!merged)
-          inner->add(fit_label({{ "(" + p.allowed_ips + ")", dim }}, inner_w,
-                               dim));
+        if (!merged) inner->add(fit_label(allowed_runs(p), inner_w, dim));
         inner->add(plots_row(st));
         inner->add(stats_row(p, st));
         box->add(inner);

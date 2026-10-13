@@ -19,6 +19,7 @@ add_executable(wgwatch
   src/main.cpp
   src/cli.cpp
   src/collector.cpp
+  src/dns.cpp
   src/parser.cpp
   src/rates.cpp
   src/sampler.cpp

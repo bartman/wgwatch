@@ -15,8 +15,11 @@ deterministically from the peer index so output is stable call to call.
 
 Peers are numbered globally from 1 in interface order (wg0's peers first).
 Peer n always gets endpoint n.n.n.n:<50000+n>, allowed IPs
-192.168.0.n/32, and base64 keys from sha256("fake-wg-peer-n") (real
-44-char shape, fabricated content). Interfaces get wgN names, listen
+127.0.0.1/32,192.168.0.n/32,192.0.2.1/32, and base64 keys from
+sha256("fake-wg-peer-n") (real 44-char shape, fabricated content).
+127.0.0.1 reverse-resolves via /etc/hosts (exercises the name=IP/mask
+path); 192.0.2.1 is TEST-NET-1 and never has a PTR record (exercises
+the unresolved path). Interfaces get wgN names, listen
 ports 51820+N, and matching fabricated private/public keys. Handshakes
 report the current time, so all peers always look freshly connected.
 
@@ -286,7 +289,8 @@ def main():
             st["tx"][pid] = tx
             out.append("\t".join([
                 f"wg{i}", fake_key(f"fake-wg-peer-{g}"), "(none)",
-                f"{g}.{g}.{g}.{g}:{50000 + g}", f"192.168.0.{g}/32",
+                f"{g}.{g}.{g}.{g}:{50000 + g}",
+                f"127.0.0.1/32,192.168.0.{g}/32,192.0.2.1/32",
                 str(int(now)), str(rx), str(tx), "off",
             ]))
 

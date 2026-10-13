@@ -10,10 +10,12 @@ add_executable(wgwatch_tests
   test_theme.cpp
   test_ui.cpp
   test_config.cpp
+  test_dns.cpp
   ../src/parser.cpp
   ../src/rates.cpp
   ../src/cli.cpp
   ../src/collector.cpp
+  ../src/dns.cpp
   ../src/ui.cpp
 )
 target_link_libraries(wgwatch_tests PRIVATE

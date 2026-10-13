@@ -11,6 +11,7 @@
 
 #include "cpptui.hpp"
 #include "cli.hpp"
+#include "dns.hpp"
 #include "parser.hpp"
 #include "rates.hpp"
 #include "theme.hpp"
@@ -279,7 +280,35 @@ class Ui {
   std::shared_ptr<BottomPin> err_overlay_;
   std::deque<ErrLine> errors_;
   WgFrame last_;
+  wdns::ReverseDnsCache dns_;
+
+ public:
+  // Test seam / pre-seed for the reverse-DNS display.
+  wdns::ReverseDnsCache& dns_cache() { return dns_; }
 };
+
+// Full "(...)" runs for one peer's AllowedIPs field. Resolved entries
+// become {name, bright} + {"=" + token, dim}; the rest stay {token, dim}.
+// Single shared builder so the merged first-line and standalone second-line
+// paths render identically. Pure: unit-tested.
+inline std::vector<TextRun> allowed_ip_text_runs(
+    const std::vector<wdns::ResolvedIp>& ips, cpptui::Color bright,
+    cpptui::Color dim) {
+  std::vector<TextRun> runs = {{ "(", dim }};
+  bool first = true;
+  for (const auto& e : ips) {
+    if (!first) runs.push_back({",", dim});
+    first = false;
+    if (e.name && !e.name->empty()) {
+      runs.push_back({*e.name, bright});
+      runs.push_back({"=" + e.token, dim});
+    } else {
+      runs.push_back({e.token, dim});
+    }
+  }
+  runs.push_back({")", dim});
+  return runs;
+}
 
 // Greedy codepoint wrap at max_w display columns, hard-splitting mid-word.
 // Empty input (or max_w <= 0) -> empty vector. Pure: unit-tested.
