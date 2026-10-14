@@ -19,6 +19,8 @@ std::string usage() {
          "all)\n"
          "  -s --sort <type>            how to sort endpoints (use type 'help' "
          "to see types)\n"
+         "  --lazy-sort <mode>          lazy reorder delay: off, 3s, 5s "
+         "(default 3s)\n"
          "  -v --verbose                increase log verbosity (repeat for "
          "trace)\n"
          "  --log <file>                write logs to file (default stderr)\n"
@@ -113,6 +115,50 @@ PlotMode next_plot(PlotMode m) {
   return m == PlotMode::Line ? PlotMode::Bar : PlotMode::Line;
 }
 
+std::string lazy_name(LazyMode m) {
+  switch (m) {
+    case LazyMode::Off:
+      return "off";
+    case LazyMode::S3:
+      return "3s";
+    case LazyMode::S5:
+      return "5s";
+  }
+  return "3s";  // unreachable
+}
+
+LazyMode next_lazy(LazyMode m) {
+  switch (m) {
+    case LazyMode::Off:
+      return LazyMode::S3;
+    case LazyMode::S3:
+      return LazyMode::S5;
+    case LazyMode::S5:
+      return LazyMode::Off;
+  }
+  return LazyMode::S3;  // unreachable
+}
+
+double lazy_delay_sec(LazyMode m) {
+  switch (m) {
+    case LazyMode::Off:
+      return 0.0;
+    case LazyMode::S3:
+      return 3.0;
+    case LazyMode::S5:
+      return 5.0;
+  }
+  return 3.0;  // unreachable
+}
+
+LazyMode lazy_from_name(const std::string& v) {
+  if (v == "off") return LazyMode::Off;
+  if (v == "3s") return LazyMode::S3;
+  if (v == "5s") return LazyMode::S5;
+  throw std::invalid_argument("invalid --lazy-sort '" + v +
+                              "': expected one of off,3s,5s");
+}
+
 SortKey sort_from_name(const std::string& v) {
   if (v == "native") return SortKey::Native;
   if (v == "endpoint") return SortKey::Endpoint;
@@ -199,6 +245,8 @@ CliOptions parse_cli(int argc, char* argv[], CliOptions base) {
       const std::string v = need_value(i, "--sort");
       if (v == "help") throw SortHelpRequested{};
       o.sort = sort_from_name(v);
+    } else if (a == "--lazy-sort") {
+      o.lazy = lazy_from_name(need_value(i, "--lazy-sort"));
     } else if (a == "--plot") {
       o.plot_mode = plot_from_name(need_value(i, "--plot"));
     } else if (a == "--theme") {

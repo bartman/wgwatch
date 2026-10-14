@@ -11,6 +11,7 @@ add_executable(wgwatch_tests
   test_ui.cpp
   test_config.cpp
   test_dns.cpp
+  test_lazy.cpp
   ../src/parser.cpp
   ../src/rates.cpp
   ../src/cli.cpp

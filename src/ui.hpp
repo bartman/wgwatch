@@ -1,11 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <map>
 #include <memory>
 #include <optional>
 
@@ -255,7 +257,78 @@ class BottomPin : public cpptui::Container {
 
 // Root layout owner. refresh() runs on the UI thread only (wired via
 // App::post from the sampler callback). Keys: q quit, k keys, s sort,
-// p plot mode, t theme.
+// l lazy, p plot mode, t theme.
+// Debounced peer-order adoption ("lazy sorting"). sort_peers() stays pure;
+// this remembers the displayed order across refresh() calls and only adopts
+// a fresh order once it persists for delay_sec (frame timestamps), so a
+// one-frame spike never bounces rows. Peer joins/leaves adopt immediately.
+// Pure logic over key vectors: unit-tested.
+class OrderStabilizer {
+ public:
+  static std::string key_of(const WgPeer& p) {
+    return p.iface + "|" + p.pubkey;
+  }
+  void reset() {
+    current_.clear();
+    pending_.clear();
+  }
+  // Display order for this frame. delay_sec <= 0 adopts fresh every time.
+  std::vector<const WgPeer*> update(
+      const std::vector<const WgPeer*>& fresh, double tstamp,
+      double delay_sec) {
+    if (delay_sec <= 0.0 || current_.empty()) {
+      adopt(fresh);
+      return fresh;
+    }
+    std::map<std::string, const WgPeer*> by_key;
+    std::vector<std::string> fresh_keys;
+    for (const WgPeer* p : fresh) {
+      by_key[key_of(*p)] = p;
+      fresh_keys.push_back(key_of(*p));
+    }
+    // Structural change: adopt immediately, never hide a join/leave.
+    if (by_key.size() != current_.size()) {
+      adopt(fresh);
+      return fresh;
+    }
+    for (const auto& k : fresh_keys)
+      if (std::find(current_.begin(), current_.end(), k) == current_.end()) {
+        adopt(fresh);
+        return fresh;
+      }
+    if (fresh_keys == current_) {
+      pending_.clear();
+      return order_as(current_, by_key);
+    }
+    if (fresh_keys == pending_ && tstamp - pending_since_ >= delay_sec) {
+      adopt(fresh);
+      return fresh;
+    }
+    if (fresh_keys != pending_) {
+      pending_ = fresh_keys;
+      pending_since_ = tstamp;
+    }
+    return order_as(current_, by_key);
+  }
+
+ private:
+  void adopt(const std::vector<const WgPeer*>& fresh) {
+    current_.clear();
+    for (const WgPeer* p : fresh) current_.push_back(key_of(*p));
+    pending_.clear();
+  }
+  static std::vector<const WgPeer*> order_as(
+      const std::vector<std::string>& keys,
+      const std::map<std::string, const WgPeer*>& by_key) {
+    std::vector<const WgPeer*> out;
+    for (const auto& k : keys) out.push_back(by_key.at(k));
+    return out;
+  }
+  std::vector<std::string> current_;
+  std::vector<std::string> pending_;
+  double pending_since_ = 0.0;
+};
+
 class Ui {
  public:
   Ui(cpptui::App& app, CliOptions& opts, RateTracker& tracker);
@@ -281,6 +354,7 @@ class Ui {
   std::deque<ErrLine> errors_;
   WgFrame last_;
   wdns::ReverseDnsCache dns_;
+  OrderStabilizer order_;
 
  public:
   // Test seam / pre-seed for the reverse-DNS display.

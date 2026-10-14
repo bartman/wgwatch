@@ -112,6 +112,12 @@ Ui::Ui(cpptui::App& app, CliOptions& opts, RateTracker& tracker)
   });
   app_->register_key('s', [this] {
     opts_->sort = next_sort(opts_->sort);
+    order_.reset();
+    refresh(last_);
+    wconfig::save_config(*opts_);
+  });
+  app_->register_key('l', [this] {
+    opts_->lazy = next_lazy(opts_->lazy);
     refresh(last_);
     wconfig::save_config(*opts_);
   });
@@ -199,9 +205,10 @@ void Ui::refresh(const WgFrame& frame) {
   const auto add_footer = [&] {
     footer_->set_text(to_styled(fit_runs(
         {{fmt::format(
-              "q quit, s sort ({}), p plot ({}), t theme ({}), i inactive "
-              "({}), k keys ({})",
-              sort_name(opts_->sort), plot_name(opts_->plot_mode), th.name,
+              "q quit, s sort ({}), l lazy ({}), p plot ({}), t theme ({}), "
+              "i inactive ({}), k keys ({})",
+              sort_name(opts_->sort), lazy_name(opts_->lazy),
+              plot_name(opts_->plot_mode), th.name,
               opts_->hide_inactive ? "hidden" : "shown",
               opts_->show_keys ? "shown" : "hidden"),
           dim}},
@@ -228,6 +235,8 @@ void Ui::refresh(const WgFrame& frame) {
                                  return p->handshake == 0;
                                }),
                 order.end());
+  // Lazy sorting: hold the displayed order until a fresh one persists.
+  order = order_.update(order, frame.tstamp, lazy_delay_sec(opts_->lazy));
   std::map<std::string, const WgIface*> ifaces;
   for (const WgIface& fi : frame.ifaces) ifaces[fi.name] = &fi;
   // Consecutive same-interface runs: one header line each, and one shared

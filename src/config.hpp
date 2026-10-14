@@ -15,6 +15,7 @@
 //
 //   update = 1
 //   sort = mru
+//   lazy_sort = 3s
 //   plot = line
 //   theme = github-dark
 //   inactive = hide
@@ -51,6 +52,8 @@ inline void read_config(std::istream& in, CliOptions& o) {
         o.update_sec = update_from_string(val);
       } else if (key == "sort") {
         o.sort = sort_from_name(val);
+      } else if (key == "lazy_sort") {
+        o.lazy = lazy_from_name(val);
       } else if (key == "plot") {
         o.plot_mode = plot_from_name(val);
       } else if (key == "theme") {
@@ -85,6 +88,7 @@ inline void read_config(std::istream& in, CliOptions& o) {
 inline void write_config(std::ostream& out, const CliOptions& o) {
   out << "update = " << o.update_sec << "\n";
   out << "sort = " << sort_name(o.sort) << "\n";
+  out << "lazy_sort = " << lazy_name(o.lazy) << "\n";
   out << "plot = " << plot_name(o.plot_mode) << "\n";
   out << "theme = " << wtheme::theme_at(o.theme).name << "\n";
   out << "inactive = " << (o.hide_inactive ? "hide" : "show") << "\n";

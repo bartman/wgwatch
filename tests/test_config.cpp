@@ -20,6 +20,7 @@ TEST(Config, ExactDefaultFormat) {
   EXPECT_EQ(out.str(),
             "update = 1\n"
             "sort = mru\n"
+            "lazy_sort = 3s\n"
             "plot = line\n"
             "theme = catppuccin-mocha\n"
             "inactive = show\n"
@@ -43,6 +44,13 @@ TEST(Config, RoundTripKeepsEverything) {
   wconfig::read_config(in, back);
   EXPECT_DOUBLE_EQ(back.update_sec, 0.5);
   EXPECT_EQ(back.sort, SortKey::Rate);
+  o.lazy = LazyMode::S5;
+  std::ostringstream out2;
+  wconfig::write_config(out2, o);
+  CliOptions back2;
+  std::istringstream in2(out2.str());
+  wconfig::read_config(in2, back2);
+  EXPECT_EQ(back2.lazy, LazyMode::S5);
   EXPECT_EQ(back.plot_mode, PlotMode::Bar);
   EXPECT_EQ(back.theme, 6u);
   EXPECT_TRUE(back.hide_inactive);
