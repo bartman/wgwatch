@@ -87,17 +87,26 @@ std::string sort_name(SortKey s) {
   return "mru";  // unreachable
 }
 
+namespace {
+constexpr SortKey kSortOrder[] = {
+    SortKey::Native,   SortKey::Endpoint, SortKey::Allowed,
+    SortKey::Mru,      SortKey::Lru,      SortKey::Handshake,
+    SortKey::RxBytes,  SortKey::TxBytes,  SortKey::Bytes,
+    SortKey::RxRate,   SortKey::TxRate,   SortKey::Rate,
+};
+constexpr std::size_t kSortN =
+    sizeof(kSortOrder) / sizeof(kSortOrder[0]);
+}  // namespace
+
 SortKey next_sort(SortKey s) {
-  static constexpr SortKey kOrder[] = {
-      SortKey::Native,   SortKey::Endpoint, SortKey::Allowed,
-      SortKey::Mru,      SortKey::Lru,      SortKey::Handshake,
-      SortKey::RxBytes,
-      SortKey::TxBytes,  SortKey::Bytes,    SortKey::RxRate,
-      SortKey::TxRate,   SortKey::Rate,
-  };
-  constexpr auto n = sizeof(kOrder) / sizeof(kOrder[0]);
-  for (std::size_t i = 0; i < n; ++i)
-    if (kOrder[i] == s) return kOrder[(i + 1) % n];
+  for (std::size_t i = 0; i < kSortN; ++i)
+    if (kSortOrder[i] == s) return kSortOrder[(i + 1) % kSortN];
+  return SortKey::Mru;
+}
+
+SortKey prev_sort(SortKey s) {
+  for (std::size_t i = 0; i < kSortN; ++i)
+    if (kSortOrder[i] == s) return kSortOrder[(i + kSortN - 1) % kSortN];
   return SortKey::Mru;
 }
 
@@ -135,6 +144,18 @@ LazyMode next_lazy(LazyMode m) {
       return LazyMode::S5;
     case LazyMode::S5:
       return LazyMode::Off;
+  }
+  return LazyMode::S3;  // unreachable
+}
+
+LazyMode prev_lazy(LazyMode m) {
+  switch (m) {
+    case LazyMode::Off:
+      return LazyMode::S5;
+    case LazyMode::S3:
+      return LazyMode::Off;
+    case LazyMode::S5:
+      return LazyMode::S3;
   }
   return LazyMode::S3;  // unreachable
 }

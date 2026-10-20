@@ -1,7 +1,9 @@
 #include "ui.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <ctime>
+#include <functional>
 #include <map>
 #include <utility>
 #include <vector>
@@ -110,32 +112,50 @@ Ui::Ui(cpptui::App& app, CliOptions& opts, RateTracker& tracker)
     refresh(last_);
     wconfig::save_config(*opts_);
   });
-  app_->register_key('s', [this] {
-    opts_->sort = next_sort(opts_->sort);
+  // s/l/p/t step forward; Shift steps back. Plain terminals deliver
+  // Shift+x as 'X', enhanced ones (kitty protocol) as x+shift flag:
+  // bind both to the reverse action.
+  const auto bind_cycle = [&](int key, std::function<void()> fwd,
+                              std::function<void()> rev) {
+    app_->register_key(key, std::move(fwd));
+    app_->register_key(std::toupper(key), rev);
+    app_->register_key(key, rev, false, false, true);
+  };
+  const auto step_sort = [this](bool fwd) {
+    opts_->sort = fwd ? next_sort(opts_->sort) : prev_sort(opts_->sort);
     order_.reset();
     refresh(last_);
     wconfig::save_config(*opts_);
-  });
-  app_->register_key('l', [this] {
-    opts_->lazy = next_lazy(opts_->lazy);
+  };
+  bind_cycle('s', [step_sort] { step_sort(true); },
+             [step_sort] { step_sort(false); });
+  const auto step_lazy = [this](bool fwd) {
+    opts_->lazy = fwd ? next_lazy(opts_->lazy) : prev_lazy(opts_->lazy);
     refresh(last_);
     wconfig::save_config(*opts_);
-  });
+  };
+  bind_cycle('l', [step_lazy] { step_lazy(true); },
+             [step_lazy] { step_lazy(false); });
   app_->register_key('i', [this] {
     opts_->hide_inactive = !opts_->hide_inactive;
     refresh(last_);
     wconfig::save_config(*opts_);
   });
-  app_->register_key('p', [this] {
+  // Toggle is its own reverse: same action both directions.
+  const auto step_plot = [this] {
     opts_->plot_mode = next_plot(opts_->plot_mode);
     refresh(last_);
     wconfig::save_config(*opts_);
-  });
-  app_->register_key('t', [this] {
-    opts_->theme = (opts_->theme + 1) % wtheme::num_themes();
+  };
+  bind_cycle('p', step_plot, step_plot);
+  const auto step_theme = [this](bool fwd) {
+    const std::size_t n = wtheme::num_themes();
+    opts_->theme = fwd ? (opts_->theme + 1) % n : (opts_->theme + n - 1) % n;
     refresh(last_);
     wconfig::save_config(*opts_);
-  });
+  };
+  bind_cycle('t', [step_theme] { step_theme(true); },
+             [step_theme] { step_theme(false); });
 }
 
 void Ui::refresh(const WgFrame& frame) {

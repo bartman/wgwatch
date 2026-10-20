@@ -169,6 +169,13 @@ TEST(Sort, HandshakeIgnoresRxActivity) {
   EXPECT_EQ(order_of(sort_peers(f2, tr.peers(), SortKey::Mru)), "BA");
 }
 
+TEST(Sort, PrevSortReversesNext) {
+  EXPECT_EQ(prev_sort(SortKey::Mru), SortKey::Allowed);
+  EXPECT_EQ(prev_sort(SortKey::Native), SortKey::Rate);  // wraps
+  EXPECT_EQ(next_sort(prev_sort(SortKey::Lru)), SortKey::Lru);
+  EXPECT_EQ(prev_sort(next_sort(SortKey::Handshake)), SortKey::Handshake);
+}
+
 TEST(Sort, NextSortCycles) {
   EXPECT_EQ(next_sort(SortKey::Mru), SortKey::Lru);
   EXPECT_EQ(next_sort(SortKey::Lru), SortKey::Handshake);

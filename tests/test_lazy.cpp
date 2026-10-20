@@ -90,6 +90,10 @@ TEST(LazyMode, CycleNamesAndDelays) {
   EXPECT_DOUBLE_EQ(lazy_delay_sec(LazyMode::Off), 0.0);
   EXPECT_DOUBLE_EQ(lazy_delay_sec(LazyMode::S3), 3.0);
   EXPECT_DOUBLE_EQ(lazy_delay_sec(LazyMode::S5), 5.0);
+  EXPECT_EQ(prev_lazy(LazyMode::Off), LazyMode::S5);
+  EXPECT_EQ(prev_lazy(LazyMode::S3), LazyMode::Off);
+  EXPECT_EQ(prev_lazy(LazyMode::S5), LazyMode::S3);
+  EXPECT_EQ(next_lazy(prev_lazy(LazyMode::S3)), LazyMode::S3);
   EXPECT_EQ(lazy_from_name("off"), LazyMode::Off);
   EXPECT_EQ(lazy_from_name("3s"), LazyMode::S3);
   EXPECT_EQ(lazy_from_name("5s"), LazyMode::S5);

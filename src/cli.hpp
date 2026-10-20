@@ -65,10 +65,12 @@ std::string version_string();  // "wgwatch X.Y.Z"
 std::string sort_help();       // sort type list for --sort help
 std::string sort_name(SortKey s);
 SortKey next_sort(SortKey s);  // cycle order for the 's' key
+SortKey prev_sort(SortKey s);  // reverse cycle for Shift+'s'
 std::string plot_name(PlotMode m);
 PlotMode next_plot(PlotMode m);  // toggle for the 'p' key
 std::string lazy_name(LazyMode m);
 LazyMode next_lazy(LazyMode m);  // cycle for the 'l' key
+LazyMode prev_lazy(LazyMode m);  // reverse cycle for Shift+'l'
 // Settle delay in seconds (0 when off).
 double lazy_delay_sec(LazyMode m);
 // Validated value parser; throws std::invalid_argument on bad input.
