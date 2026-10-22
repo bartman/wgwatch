@@ -24,6 +24,7 @@ TEST(Config, ExactDefaultFormat) {
             "plot = line\n"
             "theme = catppuccin-mocha\n"
             "inactive = show\n"
+            "zero = show\n"
             "public_keys = hide\n");
 }
 
@@ -34,6 +35,7 @@ TEST(Config, RoundTripKeepsEverything) {
   o.plot_mode = PlotMode::Bar;
   o.theme = 6;
   o.hide_inactive = true;
+  o.hide_zero = true;
   o.show_keys = true;
   o.interface = "wg0";  // never persisted
   o.remote = "h";       // never persisted
@@ -54,6 +56,7 @@ TEST(Config, RoundTripKeepsEverything) {
   EXPECT_EQ(back.plot_mode, PlotMode::Bar);
   EXPECT_EQ(back.theme, 6u);
   EXPECT_TRUE(back.hide_inactive);
+  EXPECT_TRUE(back.hide_zero);
   EXPECT_TRUE(back.show_keys);
   EXPECT_EQ(back.interface, "all");
   EXPECT_FALSE(back.remote.has_value());
@@ -69,6 +72,7 @@ TEST(Config, BadLinesIgnoredLastValidWins) {
       "plot = dots\n"
       "theme = nope\n"
       "inactive = maybe\n"
+      "zero = maybe\n"
       "public_keys = sometimes\n"
       "update = 2\n");
   wconfig::read_config(in, o);
@@ -77,6 +81,7 @@ TEST(Config, BadLinesIgnoredLastValidWins) {
   EXPECT_EQ(o.plot_mode, PlotMode::Line);
   EXPECT_EQ(o.theme, 0u);
   EXPECT_FALSE(o.hide_inactive);
+  EXPECT_FALSE(o.hide_zero);
   EXPECT_FALSE(o.show_keys);
 }
 

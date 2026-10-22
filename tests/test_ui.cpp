@@ -248,6 +248,32 @@ TEST(Refresh, HideInactiveFiltersNeverHandshook) {
   EXPECT_EQ(count_boxes(true), 2u);
 }
 
+TEST(Refresh, HideZeroFiltersIdlePeers) {
+  const auto count_boxes = [&](bool hide) {
+    cpptui::App app;
+    CliOptions opts;
+    opts.hide_zero = hide;
+    RateTracker tracker;
+    tracker.ingest(synthetic_frame(1000.0, 100));
+    WgFrame f2 = synthetic_frame(1001.0, 200);
+    f2.peers[1].rx = 200;  // B rx flat vs baseline ...
+    f2.peers[1].tx = 100;  // ... and tx flat: zero window activity
+    tracker.ingest(f2);
+    Ui ui(app, opts, tracker);
+    ui.refresh(f2);
+    const auto root =
+        std::dynamic_pointer_cast<cpptui::Container>(ui.root());
+    const auto column = std::dynamic_pointer_cast<cpptui::Container>(
+        root->get_children()[0]);
+    const auto body = std::dynamic_pointer_cast<cpptui::Container>(
+        column->get_children()[1]);
+    return body->get_children().size();
+  };
+  // iface + two boxes vs A only (inside the flex body).
+  EXPECT_EQ(count_boxes(false), 3u);
+  EXPECT_EQ(count_boxes(true), 2u);
+}
+
 TEST(CompressedHeight, ExactFitMath) {
   // 2 chrome + 2*1 run + 3*2 fixed + 2*h <= 12 -> h = 1.
   EXPECT_EQ(compressed_plot_height(12, 1, 2), 1);

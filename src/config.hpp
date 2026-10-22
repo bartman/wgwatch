@@ -19,6 +19,7 @@
 //   plot = line
 //   theme = github-dark
 //   inactive = hide
+//   zero = hide
 //   public_keys = hidden
 //
 // remote/interface are never persisted (always local/all). Unknown keys
@@ -67,6 +68,13 @@ inline void read_config(std::istream& in, CliOptions& o) {
           o.hide_inactive = false;
         else
           throw std::invalid_argument(val);
+      } else if (key == "zero") {
+        if (val == "hide")
+          o.hide_zero = true;
+        else if (val == "show")
+          o.hide_zero = false;
+        else
+          throw std::invalid_argument(val);
       } else if (key == "public_keys") {
         if (val == "show")
           o.show_keys = true;
@@ -92,6 +100,7 @@ inline void write_config(std::ostream& out, const CliOptions& o) {
   out << "plot = " << plot_name(o.plot_mode) << "\n";
   out << "theme = " << wtheme::theme_at(o.theme).name << "\n";
   out << "inactive = " << (o.hide_inactive ? "hide" : "show") << "\n";
+  out << "zero = " << (o.hide_zero ? "hide" : "show") << "\n";
   out << "public_keys = " << (o.show_keys ? "show" : "hide") << "\n";
 }
 

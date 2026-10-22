@@ -37,6 +37,8 @@ enum class LazyMode {
 struct CliOptions {
   bool show_keys = false;
   bool hide_inactive = false;  // --hide-inactive, 'i' toggles
+  bool hide_zero = false;      // --hide-zero, 'z' toggles: hide peers with
+                               // no rx/tx in the retained window
   double update_sec = 1.0;
   std::string interface = "all";
   std::optional<std::string> remote;

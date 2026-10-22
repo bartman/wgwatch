@@ -26,6 +26,8 @@ std::string usage() {
          "  --log <file>                write logs to file (default stderr)\n"
          "  --show-keys                 show keys (default hide them)\n"
          "  --hide-inactive             hide peers that never handshook\n"
+         "  --hide-zero                 hide peers with no traffic in the "
+         "retained window\n"
          "  --plot <type>               plot style: line, bar\n"
          "  --theme <name>              color theme (default catppuccin-mocha)\n"
          "  --inactive <mode>           hide|show peers that never handshook\n"
@@ -239,6 +241,8 @@ CliOptions parse_cli(int argc, char* argv[], CliOptions base) {
       o.show_keys = true;
     } else if (a == "--hide-inactive") {
       o.hide_inactive = true;
+    } else if (a == "--hide-zero") {
+      o.hide_zero = true;
     } else if (a == "--verbose") {
       ++o.verbose;
     } else if (std::regex_match(a, v_bundle_re)) {

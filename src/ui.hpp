@@ -257,7 +257,8 @@ class BottomPin : public cpptui::Container {
 
 // Root layout owner. refresh() runs on the UI thread only (wired via
 // App::post from the sampler callback). Keys: q quit, k keys, s sort,
-// l lazy, p plot mode, t theme (Shift reverses the s/l/p/t cycles).
+// l lazy, p plot mode, t theme (Shift reverses the s/l/p/t cycles),
+// i inactive, z zero.
 // Debounced peer-order adoption ("lazy sorting"). sort_peers() stays pure;
 // this remembers the displayed order across refresh() calls and only adopts
 // a fresh order once it persists for delay_sec (frame timestamps), so a

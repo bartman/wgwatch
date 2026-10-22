@@ -99,6 +99,16 @@ TEST(WindowStats, ConstantYieldsItself) {
   EXPECT_DOUBLE_EQ(s.peak, 4.0);
 }
 
+TEST(Rates, WindowActivityNeedsNonzeroSample) {
+  RateTracker tr;
+  tr.ingest(frame_at(100.0, 1000, 2000));
+  EXPECT_FALSE(has_window_activity(tr.peers().at("wg0|k1")));  // baseline
+  tr.ingest(frame_at(101.0, 1000, 2000));  // flat counters
+  EXPECT_FALSE(has_window_activity(tr.peers().at("wg0|k1")));
+  tr.ingest(frame_at(102.0, 1100, 2000));  // rx moved
+  EXPECT_TRUE(has_window_activity(tr.peers().at("wg0|k1")));
+}
+
 TEST(WindowStats, RampMeanAndPeak) {
   std::array<double, 120> h{};
   for (std::size_t i = 0; i < 4; ++i) h[i] = static_cast<double>(i + 1);

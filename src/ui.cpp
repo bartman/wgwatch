@@ -141,6 +141,11 @@ Ui::Ui(cpptui::App& app, CliOptions& opts, RateTracker& tracker)
     refresh(last_);
     wconfig::save_config(*opts_);
   });
+  app_->register_key('z', [this] {
+    opts_->hide_zero = !opts_->hide_zero;
+    refresh(last_);
+    wconfig::save_config(*opts_);
+  });
   // Toggle is its own reverse: same action both directions.
   const auto step_plot = [this] {
     opts_->plot_mode = next_plot(opts_->plot_mode);
@@ -226,10 +231,11 @@ void Ui::refresh(const WgFrame& frame) {
     footer_->set_text(to_styled(fit_runs(
         {{fmt::format(
               "q quit, s sort ({}), l lazy ({}), p plot ({}), t theme ({}), "
-              "i inactive ({}), k keys ({})",
+              "i inactive ({}), z zero ({}), k keys ({})",
               sort_name(opts_->sort), lazy_name(opts_->lazy),
               plot_name(opts_->plot_mode), th.name,
               opts_->hide_inactive ? "hidden" : "shown",
+              opts_->hide_zero ? "hidden" : "shown",
               opts_->show_keys ? "shown" : "hidden"),
           dim}},
         term_cols)));
@@ -253,6 +259,17 @@ void Ui::refresh(const WgFrame& frame) {
     order.erase(std::remove_if(order.begin(), order.end(),
                                [](const WgPeer* p) {
                                  return p->handshake == 0;
+                               }),
+                order.end());
+  // Zero = no rx/tx in the retained window. Missing tracker state means
+  // no observed samples yet, so those peers hide too.
+  if (opts_->hide_zero)
+    order.erase(std::remove_if(order.begin(), order.end(),
+                               [&](const WgPeer* p) {
+                                 const auto it = states.find(p->iface + "|" +
+                                                             p->pubkey);
+                                 return it == states.end() ||
+                                        !has_window_activity(it->second);
                                }),
                 order.end());
   // Lazy sorting: hold the displayed order until a fresh one persists.

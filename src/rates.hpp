@@ -36,6 +36,14 @@ struct PeerState {
   double last_rx_activity = -1.0;
 };
 
+// True when any retained rx/tx sample is nonzero: the peer moved data in
+// the display window. Pure: unit-tested.
+inline bool has_window_activity(const PeerState& st) {
+  for (std::size_t i = 0; i < st.n; ++i)
+    if (st.rx_hist[i] > 0.0 || st.tx_hist[i] > 0.0) return true;
+  return false;
+}
+
 // Mean and peak over the retained rate window (what the plots show).
 // Pure: unit-tested.
 struct WindowStats {
