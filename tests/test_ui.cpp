@@ -34,14 +34,10 @@ TEST(PlotHeight, MidRange) {
 
 TEST(PlotHeight, TinyTerminalFloor) { EXPECT_EQ(plot_height_for(10, 1, 5), 1); }
 
-TEST(MergeAllowedIps, OnlyWhenSqueezedAndWide) {
-  // 2 + 1 + 3*5 = 18 fixed; 21 rows -> h=1; merged: (21-3-12)/3 = 2.
-  EXPECT_TRUE(merge_allowed_ips(21, 80, 1, 3));
-  EXPECT_EQ(plot_height_for(21, 1, 3, 4), 2);
-  EXPECT_FALSE(merge_allowed_ips(21, 79, 1, 3));  // too narrow
-  EXPECT_FALSE(merge_allowed_ips(27, 120, 1, 3));  // h=3 already
-  // h=1 but merging gains nothing: (19-3-12)/3 = 1.
-  EXPECT_FALSE(merge_allowed_ips(19, 120, 1, 3));
+TEST(RunsWidth, SumsDisplayColumns) {
+  EXPECT_EQ(runs_width({}), 0);
+  EXPECT_EQ(runs_width({{"abc", std::nullopt}, {"…", std::nullopt}}), 4);
+  EXPECT_EQ(runs_width({{"(10.255.0.2/32)", std::nullopt}}), 15);
 }
 
 TEST(BarRows, EmptyOnBadInput) {
@@ -176,16 +172,16 @@ TEST(Refresh, BoxesPeersWithHeaderAndFooter) {
   ASSERT_NE(box0, nullptr);
   ASSERT_NE(box1, nullptr);
   EXPECT_EQ(box0->fixed_height, box1->fixed_height);
-  EXPECT_GE(box0->fixed_height, 6);  // 5 fixed lines + >= 1 plot line
-  EXPECT_LE(box0->fixed_height, 9);  // 5 fixed lines + <= 4 plot lines
-  // Box content: info, allowed-ips, plots row, stats row.
+  EXPECT_GE(box0->fixed_height, 5);  // 4 fixed lines + >= 1 plot line
+  EXPECT_LE(box0->fixed_height, 8);  // 4 fixed lines + <= 4 plot lines
+  // Box content: merged info, plots row, stats row.
   const auto inner =
       std::dynamic_pointer_cast<cpptui::Container>(box0->get_children()[0]);
   ASSERT_NE(inner, nullptr);
-  ASSERT_EQ(inner->get_children().size(), 4u);
+  ASSERT_EQ(inner->get_children().size(), 3u);
   // Plots row and stats row share geometry: flex / fixed-3 gap / flex,
   // so "tx" starts under the right-hand plot.
-  for (const std::size_t row : {2u, 3u}) {
+  for (const std::size_t row : {1u, 2u}) {
     const auto hrow = std::dynamic_pointer_cast<cpptui::Horizontal>(
         inner->get_children()[row]);
     ASSERT_NE(hrow, nullptr) << "row " << row;
@@ -194,6 +190,59 @@ TEST(Refresh, BoxesPeersWithHeaderAndFooter) {
     EXPECT_EQ(hrow->get_children()[0]->fixed_width, 0);
     EXPECT_EQ(hrow->get_children()[2]->fixed_width, 0);
   }
+}
+
+TEST(Refresh, LongLinesSplitIntoTwo) {
+  // A peer whose merged info line exceeds the 78-column box content keeps
+  // its own allowed-IPs second line; a short peer still merges into one.
+  auto narrow = synthetic_frame(1001.0, 200, 1).peers[0];
+  narrow.pubkey = "peer-narrow";
+  narrow.endpoint = "1.2.3.4:5";
+  narrow.allowed_ips = "10.255.0.9/32";
+  auto wide = narrow;
+  wide.pubkey = "peer-wide";
+  wide.endpoint = std::string(60, 'e') + ":1234";
+  wide.allowed_ips = "10.255.0.2/32,10.255.0.3/32,10.255.0.4/32";
+  WgFrame f;
+  f.tstamp = 1001.0;
+  f.ifaces.push_back(WgIface{"wr0", "iface-priv", "iface-pub", 51820});
+  f.peers = {narrow, wide};
+  cpptui::App app;
+  CliOptions opts;
+  RateTracker tracker;
+  Ui ui(app, opts, tracker);
+  ui.refresh(f);
+  const auto root =
+      std::dynamic_pointer_cast<cpptui::Container>(ui.root());
+  ASSERT_NE(root, nullptr);
+  const auto column =
+      std::dynamic_pointer_cast<cpptui::Container>(root->get_children()[0]);
+  ASSERT_NE(column, nullptr);
+  const auto body =
+      std::dynamic_pointer_cast<cpptui::Container>(
+          column->get_children()[1]);
+  ASSERT_NE(body, nullptr);
+  // Interface line + two peer boxes.
+  ASSERT_EQ(body->get_children().size(), 3u);
+  std::vector<std::size_t> inner_sizes;
+  std::vector<int> heights;
+  for (std::size_t i = 1; i < 3; ++i) {
+    const auto box = std::dynamic_pointer_cast<cpptui::Border>(
+        body->get_children()[i]);
+    ASSERT_NE(box, nullptr) << "child " << i;
+    const auto inner =
+        std::dynamic_pointer_cast<cpptui::Container>(
+            box->get_children()[0]);
+    ASSERT_NE(inner, nullptr) << "child " << i;
+    inner_sizes.push_back(inner->get_children().size());
+    heights.push_back(box->fixed_height);
+  }
+  // One merged box (3 rows) and one split box (4 rows), order-independent.
+  std::sort(inner_sizes.begin(), inner_sizes.end());
+  EXPECT_EQ(inner_sizes,
+            (std::vector<std::size_t>{3u, 4u}));
+  // Same shared plot height: the split box costs exactly one extra row.
+  EXPECT_EQ(std::abs(heights[0] - heights[1]), 1);
 }
 
 TEST(Refresh, StaleFrameShowsErrAndFooter) {

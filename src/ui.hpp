@@ -33,13 +33,6 @@ inline int plot_height_for(int term_rows, int n_ifaces, int n_peers,
   return h;
 }
 
-// Normal mode squeezed to a 1-line plot on a wide (>= 80 col) terminal:
-// moving allowed-ips onto the info line frees a row for the plot.
-inline bool merge_allowed_ips(int term_rows, int term_cols, int n_ifaces,
-                              int n_peers) {
-  return term_cols >= 80 && plot_height_for(term_rows, n_ifaces, n_peers) == 1 &&
-         plot_height_for(term_rows, n_ifaces, n_peers, 4) > 1;
-}
 
 // Plot height (compressed mode): peers share one box per interface run, so
 // each peer costs 2 fixed lines (info, stats) plus h plot lines, and each
@@ -99,6 +92,15 @@ inline std::vector<TextRun> fit_runs(std::vector<TextRun> runs, int max_w) {
     break;
   }
   return out;
+}
+
+// Display width of runs in columns (pure). Decides per peer whether the
+// merged info line (endpoint + handshake + key + allowed-IPs) fits, so a
+// short peer shows one line while a long one splits into two.
+inline int runs_width(const std::vector<TextRun>& runs) {
+  int w = 0;
+  for (const auto& r : runs) w += cpptui::utf8_display_width(r.text);
+  return w;
 }
 
 inline cpptui::StyledText to_styled(const std::vector<TextRun>& runs) {

@@ -285,29 +285,6 @@ void Ui::refresh(const WgFrame& frame) {
     runs.emplace_back(i, j);
     i = j;
   }
-  const int n_peers = static_cast<int>(order.size());
-  const int n_runs = static_cast<int>(runs.size());
-  const int h_normal = plot_height_for(term_rows, n_runs, n_peers);
-  // Small screen, many peers: compressed shares box borders between peers
-  // (1 line, not 2) and merges allowed-IPs into the info line.
-  const bool compressed =
-      n_peers > 0 && term_rows < 2 + n_runs + n_peers * (5 + h_normal);
-  const bool merged =
-      !compressed && merge_allowed_ips(term_rows, term_cols, n_runs, n_peers);
-  const int h = compressed ? compressed_plot_height(term_rows, n_runs, n_peers)
-                : merged   ? plot_height_for(term_rows, n_runs, n_peers, 4)
-                           : h_normal;
-  // Pre-truncation widths: box content is term_cols - 2, and each stats
-  // cell mirrors its plot's flex share (remainder goes left, as flex does).
-  const int inner_w = term_cols - 2;
-  const int avail = inner_w - 3;
-  const int rx_w = avail / 2 + avail % 2;
-  const int tx_w = avail / 2;
-  const auto fit_label = [&](std::vector<TextRun> line, int w,
-                             cpptui::Color c) {
-    return std::make_shared<cpptui::Label>(
-        to_styled(fit_runs(std::move(line), w)), c);
-  };
   const auto handshake = [&](const WgPeer& p) {
     if (p.handshake == 0) return std::make_pair(std::string("never"), erc);
     const double age = std::difftime(
@@ -318,6 +295,66 @@ void Ui::refresh(const WgFrame& frame) {
     else if (age < 600.0)
       hc = wac;
     return std::make_pair(wfmt::fmt_ago(age), hc);
+  };
+  // One shared path for both AllowedIPs lines: split on ',' (wireguard
+  // joins multiple entries), resolve each host, print (name=IP/mask) when
+  // known. Non-const: first sighting of an IP kicks off its background
+  // reverse lookup as a side effect.
+  // AllowedIPs line shares the info (first) line's base color so the
+  // (name=IP) text is never dimmer than the line above it.
+  const auto allowed_runs = [&](const WgPeer& p) {
+    return allowed_ip_text_runs(wdns::resolve_all(p.allowed_ips, dns_), fg,
+                                fg);
+  };
+  const auto info_runs = [&](const WgPeer& p, bool merge) {
+    const auto [ago, hc] = handshake(p);
+    std::vector<TextRun> line = {
+        {fmt::format("{}   handshake:",
+                     p.endpoint.empty() ? "(none)" : p.endpoint),
+         std::nullopt},
+        {ago, hc},
+        {"   key:", std::nullopt},
+        {hidden_key(p.pubkey, opts_->show_keys), fg},
+    };
+    if (merge) {
+      line.push_back({"  ", std::nullopt});
+      for (auto& r : allowed_runs(p)) line.push_back(std::move(r));
+    }
+    return line;
+  };
+  // Pre-truncation width: box content is term_cols - 2.
+  const int inner_w = term_cols - 2;
+  const int n_peers = static_cast<int>(order.size());
+  const int n_runs = static_cast<int>(runs.size());
+  const int h_normal = plot_height_for(term_rows, n_runs, n_peers);
+  // Small screen, many peers: compressed shares box borders between peers
+  // (1 line, not 2) and always merges allowed-IPs into the info line.
+  const bool compressed =
+      n_peers > 0 && term_rows < 2 + n_runs + n_peers * (5 + h_normal);
+  // One line per peer when the merged info line fits inner_w; otherwise
+  // allowed-IPs stay on their own second line. Mixed peers share one plot
+  // height sized for the taller (split) boxes; all-merged gains that row
+  // back for the plots.
+  std::vector<bool> merged(static_cast<std::size_t>(n_peers), true);
+  bool all_merged = true;
+  if (!compressed) {
+    for (int i = 0; i < n_peers; ++i) {
+      merged[static_cast<std::size_t>(i)] =
+          runs_width(info_runs(*order[static_cast<std::size_t>(i)], true)) <=
+          inner_w;
+      all_merged = all_merged && merged[static_cast<std::size_t>(i)];
+    }
+  }
+  const int h = compressed ? compressed_plot_height(term_rows, n_runs, n_peers)
+                : all_merged ? plot_height_for(term_rows, n_runs, n_peers, 4)
+                             : h_normal;
+  const int avail = inner_w - 3;
+  const int rx_w = avail / 2 + avail % 2;
+  const int tx_w = avail / 2;
+  const auto fit_label = [&](std::vector<TextRun> line, int w,
+                             cpptui::Color c) {
+    return std::make_shared<cpptui::Label>(
+        to_styled(fit_runs(std::move(line), w)), c);
   };
   const auto iface_label = [&](const std::string& name) {
     const auto it = ifaces.find(name);
@@ -381,32 +418,6 @@ void Ui::refresh(const WgFrame& frame) {
                        tx_w, fg));
     return row;
   };
-  // One shared path for both AllowedIPs lines: split on ',' (wireguard
-  // joins multiple entries), resolve each host, print (name=IP/mask) when
-  // known. Non-const: first sighting of an IP kicks off its background
-  // reverse lookup as a side effect.
-  // AllowedIPs line shares the info (first) line's base color so the
-  // (name=IP) text is never dimmer than the line above it.
-  const auto allowed_runs = [&](const WgPeer& p) {
-    return allowed_ip_text_runs(wdns::resolve_all(p.allowed_ips, dns_), fg,
-                                fg);
-  };
-  const auto info_runs = [&](const WgPeer& p, bool merged) {
-    const auto [ago, hc] = handshake(p);
-    std::vector<TextRun> line = {
-        {fmt::format("{}   handshake:",
-                     p.endpoint.empty() ? "(none)" : p.endpoint),
-         std::nullopt},
-        {ago, hc},
-        {"   key:", std::nullopt},
-        {hidden_key(p.pubkey, opts_->show_keys), fg},
-    };
-    if (merged) {
-      line.push_back({"  ", std::nullopt});
-      for (auto& r : allowed_runs(p)) line.push_back(std::move(r));
-    }
-    return line;
-  };
   if (!compressed) {
     for (const auto& [begin, end] : runs) {
       body->add(iface_label(order[begin]->iface));
@@ -415,10 +426,10 @@ void Ui::refresh(const WgFrame& frame) {
         const PeerState* st = peer_state(p);
         auto box =
             std::make_shared<cpptui::Border>(cpptui::BorderStyle::Single, dim);
-        box->fixed_height = (merged ? 4 : 5) + h;
+        box->fixed_height = (merged[i] ? 4 : 5) + h;
         auto inner = std::make_shared<cpptui::Vertical>();
-        inner->add(fit_label(info_runs(p, merged), inner_w, fg));
-        if (!merged) inner->add(fit_label(allowed_runs(p), inner_w, fg));
+        inner->add(fit_label(info_runs(p, merged[i]), inner_w, fg));
+        if (!merged[i]) inner->add(fit_label(allowed_runs(p), inner_w, fg));
         inner->add(plots_row(st));
         inner->add(stats_row(p, st));
         box->add(inner);
