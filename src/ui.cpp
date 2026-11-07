@@ -385,9 +385,11 @@ void Ui::refresh(const WgFrame& frame) {
   // joins multiple entries), resolve each host, print (name=IP/mask) when
   // known. Non-const: first sighting of an IP kicks off its background
   // reverse lookup as a side effect.
+  // AllowedIPs line shares the info (first) line's base color so the
+  // (name=IP) text is never dimmer than the line above it.
   const auto allowed_runs = [&](const WgPeer& p) {
     return allowed_ip_text_runs(wdns::resolve_all(p.allowed_ips, dns_), fg,
-                                dim);
+                                fg);
   };
   const auto info_runs = [&](const WgPeer& p, bool merged) {
     const auto [ago, hc] = handshake(p);
@@ -416,7 +418,7 @@ void Ui::refresh(const WgFrame& frame) {
         box->fixed_height = (merged ? 4 : 5) + h;
         auto inner = std::make_shared<cpptui::Vertical>();
         inner->add(fit_label(info_runs(p, merged), inner_w, fg));
-        if (!merged) inner->add(fit_label(allowed_runs(p), inner_w, dim));
+        if (!merged) inner->add(fit_label(allowed_runs(p), inner_w, fg));
         inner->add(plots_row(st));
         inner->add(stats_row(p, st));
         box->add(inner);

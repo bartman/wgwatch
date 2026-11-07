@@ -60,14 +60,13 @@ TEST(DnsResolveAll, MixedResolvedAndPending) {
   EXPECT_FALSE(out[1].name.has_value());
 }
 
-TEST(AllowedIpRuns, NameBrightEqualsIpDim) {
+TEST(AllowedIpRuns, MatchesFirstLineColor) {
   const cpptui::Color bright = cpptui::Color::White();
-  const cpptui::Color dim = cpptui::Color::Black();
   const std::vector<wdns::ResolvedIp> ips = {
       {"127.0.0.1/32", std::string("localhost")},
       {"192.0.2.1/32", std::nullopt},
   };
-  const auto runs = allowed_ip_text_runs(ips, bright, dim);
+  const auto runs = allowed_ip_text_runs(ips, bright, bright);
   ASSERT_EQ(runs.size(), 6u);
   EXPECT_EQ(runs[0].text, "(");
   EXPECT_EQ(runs[1].text, "localhost");
@@ -76,9 +75,9 @@ TEST(AllowedIpRuns, NameBrightEqualsIpDim) {
   EXPECT_EQ(runs[3].text, ",");
   EXPECT_EQ(runs[4].text, "192.0.2.1/32");
   EXPECT_EQ(runs[5].text, ")");
-  // Dim runs keep the dim color, name run keeps bright.
-  EXPECT_EQ(runs[2].fg, std::optional<cpptui::Color>(dim));
-  EXPECT_EQ(runs[1].fg, std::optional<cpptui::Color>(bright));
+  // No dim runs: the (name=IP) text matches the peer info line above it.
+  for (const auto& r : runs)
+    EXPECT_EQ(r.fg, std::optional<cpptui::Color>(bright));
 }
 
 // Plain-text walk of a widget subtree.
